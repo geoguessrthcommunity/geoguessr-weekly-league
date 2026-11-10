@@ -1,23 +1,22 @@
 // ====================================================================
 // GeoGuessr Weekly Challenge - Frontend App Logic
-// ระบบคำนวณ Phantom Score (10% Missing-Score Threshold)
-// สไตล์ Google Sheets / Excel Dashboard พร้อมแท็บสลับดูคะแนนดิบ
+// Pure English UI (Rules tab is Bilingual English + Thai)
 // ====================================================================
 
 let db = null;
 let allWeeks = [];
 let currentWeek = null;
 let currentChallenges = [];
-let currentCalculatedData = null; // เก็บผลลัพธ์คำนวณสำหรับหน้าคะแนนดิบ
+let currentCalculatedData = null;
 
 let currentMainView = "leaderboard"; // "leaderboard" | "raw"
-let selectedRawSeed = 1; // Map ที่เลือกดูคะแนนดิบ (1 - 7)
+let selectedRawSeed = 1; // 1 to 7
 
 if (CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT_ID")) {
   db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 }
 
-// องค์ประกอบ DOM
+// DOM Elements
 const bannerTitle = document.getElementById("bannerTitle");
 const bannerSubInfo = document.getElementById("bannerSubInfo");
 const lastUpdateText = document.getElementById("lastUpdateText");
@@ -28,14 +27,12 @@ const scoresTableBody = document.getElementById("scoresTableBody");
 const excelTabsList = document.getElementById("excelTabsList");
 const rulesView = document.getElementById("rulesView");
 
-// DOM สำหรับสลับมุมมอง
+// View Switcher Elements
+const viewSwitchBar = document.getElementById("viewSwitchBar");
 const viewBtnLeaderboard = document.getElementById("viewBtnLeaderboard");
 const viewBtnRaw = document.getElementById("viewBtnRaw");
-const rawLockBadge = document.getElementById("rawLockBadge");
 const leaderboardView = document.getElementById("leaderboardView");
 const rawScoresView = document.getElementById("rawScoresView");
-const rawLockedNotice = document.getElementById("rawLockedNotice");
-const rawContent = document.getElementById("rawContent");
 const rawMapSelectorPills = document.getElementById("rawMapSelectorPills");
 const rawTableBody = document.getElementById("rawTableBody");
 
@@ -49,14 +46,14 @@ function formatRankDisplay(rank) {
 }
 
 /**
- * 1. เริ่มต้นระบบ โหลดสัปดาห์ทั้งหมด
+ * 1. Initialize and fetch all weeks
  */
 async function init() {
   if (!db) {
     scoresTableBody.innerHTML = `
       <tr>
         <td colspan="17" style="padding: 30px; text-align: center; color: #dc2626;">
-          ⚠️ กรุณากรอก <strong>SUPABASE_URL</strong> และ <strong>SUPABASE_ANON_KEY</strong> ในไฟล์ <code>config.js</code> ก่อนใช้งาน
+          ⚠️ Please configure <strong>SUPABASE_URL</strong> and <strong>SUPABASE_ANON_KEY</strong> in <code>config.js</code>
         </td>
       </tr>`;
     return;
@@ -69,7 +66,7 @@ async function init() {
       .order("id", { ascending: false });
 
     if (error || !weeks || weeks.length === 0) {
-      scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 30px; text-align: center;">ยังไม่มีข้อมูลการแข่งขันในระบบ</td></tr>`;
+      scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 30px; text-align: center;">No competition data available yet.</td></tr>`;
       return;
     }
 
@@ -84,7 +81,7 @@ async function init() {
 }
 
 /**
- * 2. สร้างแถบแท็บด้านล่าง (Excel / Google Sheets Style)
+ * 2. Render bottom tabs (Excel / Google Sheets style)
  */
 function renderBottomTabs() {
   const tabsHtml = allWeeks
@@ -104,7 +101,7 @@ function renderBottomTabs() {
 }
 
 /**
- * 3. เลือกสัปดาห์ที่จะดู
+ * 3. Select and load a week
  */
 async function selectWeek(weekId) {
   document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
@@ -113,29 +110,30 @@ async function selectWeek(weekId) {
 
   rulesView.style.display = "none";
 
-  scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">กำลังโหลดข้อมูลและคำนวณคะแนน Phantom Score...</td></tr>`;
+  scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">Loading data and calculating scores...</td></tr>`;
 
   const { data: week } = await db.from("weeks").select("*").eq("id", weekId).single();
   if (!week) return;
   currentWeek = week;
 
-  // อัปเดตสถานะป้ายล็อคในแท็บสลับมุมมอง
-  if (week.is_frozen) {
-    rawLockBadge.textContent = "🔓 ปลดล็อกแล้ว";
-    rawLockBadge.className = "lock-pill unlocked";
-  } else {
-    rawLockBadge.textContent = "🔒 จบวีคถึงจะดูได้";
-    rawLockBadge.className = "lock-pill";
-  }
-
-  // อัปเดต Header Banner
+  // Header Banner Info
   bannerTitle.textContent = `🏆 ${week.title}`;
-  bannerSubInfo.textContent = week.header_info || (week.is_frozen ? "❄️ การแข่งขันสัปดาห์นี้สิ้นสุดแล้ว" : "🟢 กำลังแข่งขัน (อัปเดตทุก 30 นาที)");
+  bannerSubInfo.textContent = week.header_info || (week.is_frozen ? "❄️ Competition Ended" : "🟢 Ongoing (Auto-updates every 30m)");
 
   const updateDate = week.updated_at ? new Date(week.updated_at) : new Date();
-  lastUpdateText.textContent = `${updateDate.toLocaleDateString("th-TH")} ${updateDate.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`;
+  lastUpdateText.textContent = `${updateDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${updateDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 
-  // ดึง Challenges ทั้ง 7 Seeds
+  // Show or hide View Switcher based on week status
+  // When active: completely hide the switcher and show only leaderboard
+  // When frozen: show the switcher so users can toggle between Leaderboard and Raw Scores
+  if (week.is_frozen) {
+    viewSwitchBar.style.display = "flex";
+  } else {
+    viewSwitchBar.style.display = "none";
+    currentMainView = "leaderboard";
+  }
+
+  // Load Challenges (7 Seeds)
   const { data: challenges } = await db
     .from("challenges")
     .select("*")
@@ -147,11 +145,11 @@ async function selectWeek(weekId) {
   renderTableHeaders(currentChallenges);
 
   if (currentChallenges.length === 0) {
-    scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 30px; text-align: center;">ยังไม่มีรายชื่อ Map สำหรับสัปดาห์นี้</td></tr>`;
+    scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 30px; text-align: center;">No maps found for this week.</td></tr>`;
     return;
   }
 
-  // ดึงคะแนนทั้งหมดของ Week นี้
+  // Load Scores
   const challengeIds = currentChallenges.map((c) => c.id);
   const { data: scores } = await db
     .from("scores")
@@ -160,14 +158,18 @@ async function selectWeek(weekId) {
 
   calculateAndRenderScores(scores || [], currentChallenges);
 
-  // อัปเดตมุมมองที่เปิดค้างอยู่
   switchMainView(currentMainView);
 }
 
 /**
- * 4. สลับมุมมองระหว่าง "ตารางคะแนนรวม" กับ "รายละเอียดคะแนนดิบ"
+ * 4. Switch between Leaderboard and Raw Scores View
  */
 window.switchMainView = function (viewName) {
+  // If week is not frozen, force leaderboard only
+  if (!currentWeek?.is_frozen) {
+    viewName = "leaderboard";
+  }
+
   currentMainView = viewName;
   rulesView.style.display = "none";
 
@@ -181,21 +183,12 @@ window.switchMainView = function (viewName) {
     viewBtnRaw.classList.add("active");
     leaderboardView.style.display = "none";
     rawScoresView.style.display = "block";
-
-    // ตรวจสอบว่าสัปดาห์นี้ Freeze หรือยัง
-    if (!currentWeek?.is_frozen) {
-      rawLockedNotice.style.display = "block";
-      rawContent.style.display = "none";
-    } else {
-      rawLockedNotice.style.display = "none";
-      rawContent.style.display = "block";
-      renderRawScoresView();
-    }
+    renderRawScoresView();
   }
 };
 
 /**
- * 5. สลับไปหน้าแท็บกฎกติกา (Rules)
+ * 5. Switch to Rules View
  */
 window.switchTab = function (tabName) {
   if (tabName === "rules") {
@@ -203,16 +196,17 @@ window.switchTab = function (tabName) {
     document.getElementById("tabRules").classList.add("active");
     leaderboardView.style.display = "none";
     rawScoresView.style.display = "none";
+    viewSwitchBar.style.display = "none";
     rulesView.style.display = "block";
   }
 };
 
 /**
- * 6. วาดการ์ด 7 Maps ด้านบน
+ * 6. Render the 7 Map Cards
  */
 function renderMapCards(challenges) {
   if (!challenges.length) {
-    mapsGrid.innerHTML = `<div style="grid-column: span 7; color: white; text-align: center;">ไม่มีข้อมูล Map</div>`;
+    mapsGrid.innerHTML = `<div style="grid-column: span 7; color: white; text-align: center;">No map data available</div>`;
     return;
   }
 
@@ -225,7 +219,7 @@ function renderMapCards(challenges) {
           <div class="map-desc">${escapeHtml(c.name || `Seed ${c.seed_number}`)}</div>
         </div>
         <a href="${c.url}" target="_blank" rel="noopener noreferrer" class="map-btn">
-          ▶ เล่น Challenge
+          ▶ Play Challenge
         </a>
       </div>
     `;
@@ -234,7 +228,7 @@ function renderMapCards(challenges) {
 }
 
 /**
- * 7. วาดส่วนหัวของตารางหลัก
+ * 7. Render Table Headers
  */
 function renderTableHeaders(challenges) {
   tableTopHeaderRow.innerHTML = `
@@ -262,7 +256,7 @@ function renderTableHeaders(challenges) {
 }
 
 /**
- * 8. อัลกอริทึมคำนวณ Phantom Score (10% Threshold)
+ * 8. Phantom Score (10% Threshold) Algorithm
  */
 function calculateAndRenderScores(scores, challenges) {
   const playersByMap = new Map();
@@ -295,7 +289,7 @@ function calculateAndRenderScores(scores, challenges) {
     const resultMap = new Map();
 
     if (pList.length > 0) {
-      // 1. คำนวณ Phantom Score ในแต่ละ Round (0..4 = R1..R5 เต็ม 5,000 / 5 = Total เต็ม 25,000)
+      // 1. Calculate Phantom Score for each of 6 rounds (0..4 = R1..R5 / 5 = Total)
       for (let m = 0; m < 6; m++) {
         const maxScore = m < 5 ? 5000 : 25000;
         const colRawScores = pList.map((p) => p.raw[m]);
@@ -314,13 +308,13 @@ function calculateAndRenderScores(scores, challenges) {
         });
       }
 
-      // 2. รวมคะแนนประจำ Map = ผลรวมคะแนนที่ได้รับจากทั้ง 6 Rounds ย่อย
+      // 2. Map Points = direct sum of points earned in all 6 rounds
       pList.forEach((p) => {
         p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
-        p.ptsMap = p.ptsRounds; // คะแนนในตารางคือผลรวมของ 6 Rounds
+        p.ptsMap = p.ptsRounds;
       });
 
-      // 3. จัดอันดับใน Map (เรียงตาม ptsMap มากไปน้อย)
+      // 3. Rank in map (ptsMap descending, raw total as tie breaker)
       pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
 
       pList.forEach((p, idx) => {
@@ -345,7 +339,7 @@ function calculateAndRenderScores(scores, challenges) {
 
   currentCalculatedData = { mapResults, challenges, playerNames };
 
-  // 4. สรุปคะแนนรวมทั้ง 7 Maps
+  // 4. Grand Total across all 7 Maps
   const finalLeaderboard = [];
 
   allPlayerIds.forEach((uId) => {
@@ -371,11 +365,11 @@ function calculateAndRenderScores(scores, challenges) {
   });
 
   if (finalLeaderboard.length === 0) {
-    scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">ยังไม่มีผู้เล่นเล่นจบครบ 5 รอบในสัปดาห์นี้</td></tr>`;
+    scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">No players have completed 5 rounds in this week yet.</td></tr>`;
     return;
   }
 
-  // เรียงลำดับคะแนนรวมจากมากไปน้อย
+  // Sort overall standings
   finalLeaderboard.sort((a, b) => b.grandTotal - a.grandTotal);
 
   for (let i = 0; i < finalLeaderboard.length; i++) {
@@ -386,7 +380,7 @@ function calculateAndRenderScores(scores, challenges) {
     }
   }
 
-  // วาดแถวตารางหลัก (Leaderboard Table)
+  // Render Main Leaderboard Table
   scoresTableBody.innerHTML = finalLeaderboard
     .map((p) => {
       const posDisplay = formatRankDisplay(p.overallRank);
@@ -421,21 +415,19 @@ function calculateAndRenderScores(scores, challenges) {
     })
     .join("");
 
-  // หากอยู่ในหน้าดูคะแนนดิบ ให้อัปเดตตารางคะแนนดิบด้วย
   if (currentMainView === "raw" && currentWeek?.is_frozen) {
     renderRawScoresView();
   }
 }
 
 /**
- * 9. วาดหน้าตารางคะแนนดิบแยกราย Round (Raw Scores Table)
+ * 9. Render Raw Scores Table for the selected Map
  */
 function renderRawScoresView() {
   if (!currentCalculatedData || !currentChallenges.length) return;
 
   const { mapResults, challenges } = currentCalculatedData;
 
-  // วาด Pills เลือก Map 1 ถึง 7
   rawMapSelectorPills.innerHTML = challenges
     .map((c) => {
       const isSel = c.seed_number === selectedRawSeed;
@@ -447,23 +439,20 @@ function renderRawScoresView() {
     })
     .join("");
 
-  // ดึงข้อมูล Map ที่เลือก
   const activeChallenge = challenges.find((c) => c.seed_number === selectedRawSeed) || challenges[0];
   const resultMap = mapResults.get(activeChallenge.id);
 
   if (!resultMap || resultMap.size === 0) {
-    rawTableBody.innerHTML = `<tr><td colspan="9" style="padding: 30px; text-align: center; color: #64748b;">ยังไม่มีผู้เล่นใน Map นี้</td></tr>`;
+    rawTableBody.innerHTML = `<tr><td colspan="9" style="padding: 30px; text-align: center; color: #64748b;">No players in this map yet.</td></tr>`;
     return;
   }
 
-  // ดึงรายชื่อผู้เล่นและจัดอันดับตามคะแนนในแมพนี้
   const playersList = Array.from(resultMap.values()).sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
 
   rawTableBody.innerHTML = playersList
     .map((p) => {
       const rankDisplay = formatRankDisplay(p.rank);
 
-      // สร้างช่อง R1 ถึง R5
       const roundCells = [0, 1, 2, 3, 4]
         .map((rIdx) => {
           const rawVal = p.raw[rIdx];
@@ -477,7 +466,6 @@ function renderRawScoresView() {
         })
         .join("");
 
-      // ช่อง Total (25k)
       const totalRaw = p.raw[5];
       const totalPts = p.points[5];
       const totalCell = `

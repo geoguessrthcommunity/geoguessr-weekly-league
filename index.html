@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,50 +14,49 @@
 </head>
 <body>
   <div class="dashboard-container">
-    <!-- 1. Header Banner ด้านบนสุด -->
+    <!-- 1. Header Banner -->
     <div class="top-banner">
       <div class="banner-left">
         <span id="bannerTitle">🏆 GeoGuessr Weekly League</span>
         <span>||</span>
-        <span id="bannerSubInfo">กำลังโหลดข้อมูล...</span>
+        <span id="bannerSubInfo">Loading...</span>
       </div>
       <div class="banner-right">
         <span>Last Update : <strong id="lastUpdateText">-</strong></span>
       </div>
     </div>
 
-    <!-- 2. ส่วนบน: โลโก้ซ้าย + การ์ด 7 Maps ขวา -->
+    <!-- 2. Top Section: Logo + 7 Map Cards -->
     <div class="top-section">
-      <!-- กล่องใส่โลโก้ -->
+      <!-- Logo Box -->
       <div class="logo-container">
         <img id="leagueLogo" src="logo.png" class="logo-img" alt="League Logo" 
              onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
         <div id="logoPlaceholder" class="logo-placeholder" style="display: none;">
           <span class="league-badge">GEOGUESSR</span>
-          <span style="font-size: 0.75rem; color: #94a3b8;">(ใส่ไฟล์ logo.png ที่โฟลเดอร์เว็บ)</span>
+          <span style="font-size: 0.75rem; color: #94a3b8;">(Add logo.png to folder)</span>
         </div>
       </div>
 
-      <!-- การ์ด 7 Maps -->
+      <!-- 7 Map Cards -->
       <div id="mapsGrid" class="maps-grid">
         <div style="color: white; grid-column: span 7; text-align: center; padding: 20px;">
-          กำลังโหลดรายชื่อ 7 Maps...
+          Loading 7 Maps...
         </div>
       </div>
     </div>
 
-    <!-- 3. แถบสลับมุมมอง (Sub-tabs สลับตารางคะแนนรวม กับ รายละเอียดคะแนนดิบ) -->
-    <div class="view-switch-bar">
+    <!-- 3. Sub-Navigation View Switcher (Hidden when week is active, shown when week is frozen) -->
+    <div id="viewSwitchBar" class="view-switch-bar" style="display: none;">
       <button id="viewBtnLeaderboard" class="view-tab-btn active" onclick="switchMainView('leaderboard')">
-        🏆 ตารางคะแนนรวม (Leaderboard)
+        🏆 Leaderboard
       </button>
       <button id="viewBtnRaw" class="view-tab-btn" onclick="switchMainView('raw')">
-        📊 รายละเอียดคะแนนดิบ (Raw Scores)
-        <span id="rawLockBadge" class="lock-pill">🔒 จบวีคถึงจะดูได้</span>
+        📊 Raw & Round Scores
       </button>
     </div>
 
-    <!-- 4. มุมมองที่ 1: ตารางคะแนนหลัก (Leaderboard View) -->
+    <!-- 4. View 1: Main Leaderboard Table -->
     <div id="leaderboardView" class="table-wrapper">
       <table class="sheets-table">
         <thead>
@@ -65,41 +64,29 @@
             <th class="col-pos" rowspan="2">Position</th>
             <th class="col-player" rowspan="2">Pseudo</th>
             <th class="col-total" rowspan="2">Points</th>
-            <!-- คอลัมน์ Map 1 ถึง 7 (Colspan 2) จะถูกสร้างผ่าน JS -->
+            <!-- Map 1 to 7 columns generated dynamically -->
           </tr>
           <tr id="tableSubHeaderRow">
-            <!-- Points | Rank ของแต่ละ Map -->
+            <!-- Points | Rank for each map -->
           </tr>
         </thead>
         <tbody id="scoresTableBody">
           <tr>
             <td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">
-              กำลังคำนวณคะแนน Phantom Score (10% Threshold)...
+              Calculating Phantom Scores (10% Threshold)...
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- 5. มุมมองที่ 2: ตารางคะแนนดิบแยกราย Round (Raw Scores View) -->
+    <!-- 5. View 2: Raw & Round Scores Breakdown (Only visible when week is frozen) -->
     <div id="rawScoresView" style="display: none;">
-      <!-- กรณีสัปดาห์ยังไม่จบ (ล็อกอยู่) -->
-      <div id="rawLockedNotice" class="locked-card">
-        <div style="font-size: 3rem; margin-bottom: 12px;">🔒</div>
-        <h2 style="color: var(--navy-primary); margin-bottom: 8px;">สัปดาห์นี้กำลังแข่งขันอยู่</h2>
-        <p style="color: #64748b; max-width: 500px; margin: 0 auto; line-height: 1.6;">
-          รายละเอียดคะแนนดิบราย Round และคะแนน Phantom Score จะถูกปลดล็อกให้ดูในหน้านี้เมื่อสัปดาห์นี้สิ้นสุดการแข่งขัน (Freeze) แล้วเท่านั้น เพื่อความยุติธรรมของผู้เข้าแข่งขัน
-        </p>
-      </div>
-
-      <!-- กรณีสัปดาห์จบแล้ว (ปลดล็อกให้ดูตารางเต็ม) -->
-      <div id="rawContent" class="table-wrapper" style="display: none;">
-        <!-- แถบเลือก Map 1 ถึง 7 -->
+      <div class="table-wrapper">
+        <!-- Map Selector Pills -->
         <div class="raw-controls-bar">
-          <strong style="color: #475569; font-size: 0.9rem; margin-right: 6px;">เลือก Map:</strong>
-          <div id="rawMapSelectorPills" style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <!-- Pills จะถูกสร้างผ่าน JS -->
-          </div>
+          <strong style="color: #475569; font-size: 0.9rem; margin-right: 6px;">Select Map:</strong>
+          <div id="rawMapSelectorPills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
         </div>
 
         <table class="sheets-table">
@@ -117,47 +104,71 @@
             </tr>
           </thead>
           <tbody id="rawTableBody">
-            <!-- ข้อมูลคะแนนดิบรายรอบจะถูกสร้างผ่าน JS -->
+            <!-- Round-by-round raw scores rendered dynamically -->
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- 6. ส่วนเนื้อหาหน้ารหัสกติกา (แสดงเมื่อคลิกแท็บ Rules) -->
+    <!-- 6. View 3: Rules & Scoring (Bilingual: English & Thai) -->
     <div id="rulesView" style="display: none; background: white; border: 2px solid var(--gold-accent); padding: 30px; border-radius: 0 0 6px 6px;">
-      <h2 style="color: var(--navy-primary); margin-bottom: 16px;">📜 กฎและกติกาการคำนวณคะแนน (Rules & Scoring)</h2>
+      <h2 style="color: var(--navy-primary); margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
+        📜 Rules & Scoring / กฎและกติกาการคำนวณคะแนน
+      </h2>
       <div style="line-height: 1.8; color: #334155; font-size: 0.95rem;">
-        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">1. รูปแบบการแข่งขัน</h3>
-        <p>• ในแต่ละสัปดาห์จะมีทั้งหมด <strong>7 Maps (7 Challenges)</strong> ให้ผู้เล่นเข้าไปเล่น</p>
-        <p>• แต่ละ Map มี 5 Rounds ปกติ (คะแนนเต็มรอบละ 5,000) และคะแนนรวม (เต็ม 25,000) จะนับเป็น <strong>Round ที่ 6</strong> รวมเป็น 6 Rounds ย่อยในการคำนวณ</p>
-
-        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">2. การคำนวณ Phantom Score (10% Missing-Score Threshold)</h3>
-        <p>ในแต่ละ Round จะคำนวณคะแนนแฟนทอมของผู้เล่นตามสูตร:</p>
-        <div style="background: #f1f5f9; padding: 12px 18px; border-left: 4px solid var(--navy-primary); margin: 8px 0; font-family: monospace; font-size: 1rem;">
-          Phantom Score = คะแนนดิบ + 10% × (คะแนนเต็ม - คะแนนดิบ)
+        
+        <!-- Section 1 -->
+        <div style="margin-bottom: 24px;">
+          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
+            1. Tournament Format / รูปแบบการแข่งขัน
+          </h3>
+          <p><strong>EN:</strong> Each week features <strong>7 Maps (7 Challenges)</strong>. Each map consists of 5 standard rounds (up to 5,000 points each) plus the overall raw total (up to 25,000 points), which is counted as a <strong>6th Round</strong>, giving 6 scored rounds in total per map.</p>
+          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> ในแต่ละสัปดาห์จะมีทั้งหมด 7 Maps (7 Challenges) แต่ละแมพมี 5 รอบปกติ (เต็ม 5,000) และคะแนนรวม 5 รอบ (เต็ม 25,000) นับเป็นรอบที่ 6 รวมเป็น 6 รอบย่อยในการคิดคะแนน</p>
         </div>
-        <p>• นำ Phantom Score ของเราไปเทียบกับคะแนนดิบของผู้เล่นทุกคนในตาราง</p>
-        <p>• <strong>คะแนนที่ได้รับในแต่ละ Round</strong> = จำนวนผู้เล่นที่เราชนะหรือเสมอด้วย Phantom Score นั้น</p>
 
-        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">3. คะแนนประจำ Map (Points per Map)</h3>
-        <p>• รวมคะแนนที่ได้รับจากทั้ง <strong>6 Rounds ย่อยเข้าด้วยกัน</strong> (5 Rounds ปกติ + 1 Round Total) เป็นคะแนน Points ของ Map นั้นทันที</p>
-        <p>• นำคะแนน Points ของแต่ละ Map ไปจัดอันดับเพื่อแจกเหรียญรางวัลประจำแมพ (🥇 🥈 🥉)</p>
+        <!-- Section 2 -->
+        <div style="margin-bottom: 24px;">
+          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
+            2. Phantom Score Calculation (10% Threshold) / การคำนวณ Phantom Score (เกณฑ์ 10%)
+          </h3>
+          <div style="background: #f1f5f9; padding: 12px 18px; border-left: 4px solid var(--navy-primary); margin: 8px 0; font-family: monospace; font-size: 1rem;">
+            Phantom Score = Raw Score + 10% × (Max Score - Raw Score)
+          </div>
+          <p><strong>EN:</strong> In each round, your Phantom Score is compared against the raw scores of all players in that map. Your points for that round equal the number of players whose raw scores are &le; your Phantom Score (all players you beat or tied with).</p>
+          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> ในแต่ละรอบ คะแนนแฟนทอมจะถูกนำไปเทียบกับคะแนนดิบของผู้เล่นทุกคนในแมพ แต้มที่ได้รับคือจำนวนผู้เล่นที่คะแนนดิบ &le; คะแนนแฟนทอมของเรา (จำนวนคนที่ชนะหรือเสมอ)</p>
+        </div>
 
-        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">4. คะแนนรวมประจำสัปดาห์ (Total Points)</h3>
-        <p>• รวมคะแนน Points ที่ได้รับจากทั้ง 7 Maps เข้าด้วยกันเป็นคะแนนรวมสุดท้ายเพื่อจัดอันดับประจำสัปดาห์</p>
+        <!-- Section 3 -->
+        <div style="margin-bottom: 24px;">
+          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
+            3. Points per Map / คะแนนประจำ Map
+          </h3>
+          <p><strong>EN:</strong> The points earned from all 6 rounds are summed together to become your final <strong>Map Points</strong>. Map podium medals (🥇 🥈 🥉) are awarded based on Map Points.</p>
+          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> รวมแต้มที่ได้รับจากทั้ง 6 รอบย่อยเข้าด้วยกันเป็นคะแนน Points ประจำแมพนั้นทันที พร้อมแจกเหรียญรางวัลประจำแมพ (🥇 🥈 🥉)</p>
+        </div>
+
+        <!-- Section 4 -->
+        <div>
+          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
+            4. Total Weekly Points & Standings / คะแนนรวมประจำสัปดาห์
+          </h3>
+          <p><strong>EN:</strong> Points from all 7 Maps are summed together to determine the overall weekly leaderboard standings and overall podium medals (🥇 🥈 🥉).</p>
+          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> นำ Points จากทั้ง 7 Maps มารวมกันเพื่อจัดอันดับคะแนนรวมสุดท้ายประจำสัปดาห์</p>
+        </div>
+
       </div>
     </div>
   </div>
 
-  <!-- 7. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) -->
+  <!-- 7. Bottom Navigation Bar (Excel / Google Sheets Style) -->
   <div class="excel-tabs-bar">
     <div class="excel-tab-icon">☰</div>
     <div id="excelTabsList" class="excel-tabs-list">
-      <!-- แท็บกติกา -->
+      <!-- Rules Tab (Bilingual) -->
       <div id="tabRules" class="excel-tab rules-tab" onclick="switchTab('rules')">
-        📜 กฎกติกา (Rules)
+        📜 Rules / กฎกติกา
       </div>
-      <!-- แท็บสัปดาห์ต่าง ๆ จะถูกสร้างผ่าน JS ที่นี่ -->
+      <!-- Week Tabs generated dynamically -->
     </div>
   </div>
 
