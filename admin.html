@@ -17,7 +17,7 @@
       padding: 20px;
     }
     .admin-container {
-      max-width: 900px;
+      max-width: 960px;
       margin: 0 auto;
     }
     .admin-card {
@@ -54,19 +54,29 @@
       background: var(--navy-primary);
       color: white;
       border: none;
-      padding: 9px 18px;
+      padding: 8px 14px;
       border-radius: 4px;
       font-weight: 700;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-family: inherit;
-      transition: opacity 0.15s ease;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
     .btn:hover {
       opacity: 0.9;
+      transform: translateY(-1px);
     }
     .btn-freeze {
       background: #0284c7;
+    }
+    .btn-unfreeze {
+      background: #16a34a;
+    }
+    .btn-edit {
+      background: #d97706;
     }
     .btn-danger {
       background: #dc2626;
@@ -77,17 +87,32 @@
       gap: 10px;
       align-items: center;
       background: #f8fafc;
-      padding: 10px 12px;
+      padding: 8px 12px;
       border-radius: 6px;
       border: 1px solid #e2e8f0;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
-    .week-item {
+    .week-card-item {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .week-header-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 14px 0;
-      border-bottom: 1px solid #e2e8f0;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .week-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     /* กล่องเข้าสู่ระบบ (Login Gate) */
@@ -101,6 +126,18 @@
       box-shadow: 0 10px 25px rgba(0,0,0,0.3);
       text-align: center;
     }
+
+    /* Modal แก้ไขข้อมูลสัปดาห์ & 7 Maps */
+    .edit-modal-box {
+      background: white;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 800px;
+      padding: 24px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 2px solid var(--navy-primary);
+    }
   </style>
 </head>
 <body>
@@ -111,12 +148,12 @@
       <div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>
       <h2 style="color: var(--navy-primary); margin-bottom: 6px;">ระบบควบคุมแอดมิน</h2>
       <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">
-        กรุณากรอก <code>Service Role Secret Key</code> เพื่อเข้าสู่ระบบ
+        กรุณากรอก <code>Service Role Key</code> เพื่อเข้าสู่ระบบ
       </p>
 
       <form id="loginForm">
         <input type="password" id="loginKeyInput" placeholder="วาง Service Role Key ที่นี่..." required style="margin-bottom: 14px;">
-        <button type="submit" class="btn" style="width: 100%; padding: 10px; background: var(--thai-red);">
+        <button type="submit" class="btn" style="width: 100%; padding: 10px; justify-content: center; background: var(--thai-red);">
           เข้าสู่ระบบ (Login)
         </button>
       </form>
@@ -129,10 +166,10 @@
 
     <!-- 2. แผงควบคุมแอดมิน (แสดงเมื่อล็อกอินผ่านแล้วเท่านั้น) -->
     <div id="adminDashboard" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
           <h1 style="color: white; font-size: 1.6rem; font-weight: 800;">⚙️ แผงควบคุมระบบ (Admin Panel)</h1>
-          <p style="color: #94a3b8; font-size: 0.9rem;">สร้างสัปดาห์แข่งขันใหม่ และจัดการลิงก์ทั้ง 7 Maps</p>
+          <p style="color: #94a3b8; font-size: 0.9rem;">จัดการสัปดาห์แข่งขัน, แก้ไขลิงก์ 7 Maps, ปลดล็อก/Freeze คะแนน</p>
         </div>
         <div style="display: flex; gap: 10px;">
           <a href="index.html" class="btn" style="background: var(--gold-accent); color: #0f172a; text-decoration: none;">← ไปหน้าตารางคะแนน</a>
@@ -140,24 +177,35 @@
         </div>
       </div>
 
+      <!-- รายการจัดการสัปดาห์ทั้งหมด (ย้ายขึ้นมาไว้ด้านบนสุดเพื่อให้จัดการง่าย) -->
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="color: var(--navy-primary); font-size: 1.3rem;">📋 สัปดาห์การแข่งขันทั้งหมด (Manage Weeks)</h2>
+          <button class="btn" onclick="loadWeeks()" style="background: #e2e8f0; color: #334155;">🔄 รีเฟรชรายการ</button>
+        </div>
+        <div id="weeksList">
+          <p style="color: #64748b;">กำลังโหลด...</p>
+        </div>
+      </div>
+
       <!-- ฟอร์มสร้างสัปดาห์ใหม่พร้อม 7 Maps -->
       <div class="admin-card">
-        <h2 style="color: var(--navy-primary); font-size: 1.2rem; margin-bottom: 16px;">➕ สร้างสัปดาห์แข่งขันใหม่ (New Week)</h2>
+        <h2 style="color: var(--navy-primary); font-size: 1.3rem; margin-bottom: 16px;">➕ สร้างสัปดาห์แข่งขันใหม่ (Create New Week)</h2>
         <form id="createWeekForm">
           <div class="form-group">
             <label>ชื่อสัปดาห์ (Week Title):</label>
-            <input type="text" id="weekTitle" placeholder="เช่น Cactus Ligue #11-06 หรือ Week 1" required>
+            <input type="text" id="weekTitle" placeholder="เช่น GEOTH Weekly SS1 #002" required>
           </div>
 
           <div class="form-group">
             <label>ข้อความแถบข้อมูลด้านบน (Header Info Text):</label>
-            <input type="text" id="weekHeaderInfo" placeholder="เช่น Du ven. 23 au ven. 30 octobre || You must play before October 30th">
+            <input type="text" id="weekHeaderInfo" placeholder="เช่น แข่งขัน 10 - 17 พ.ย. || ปิดรับคะแนนวันที่ 17 เวลา 20:00 น.">
           </div>
 
           <div class="form-group">
             <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
             <input type="datetime-local" id="weekEndDate">
-            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง)</small>
+            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง หรือเช็กปี ค.ศ. ให้ถูกต้อง)</small>
           </div>
 
           <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ กรอกข้อมูลทั้ง 7 Maps:</h3>
@@ -165,56 +213,91 @@
           <div id="mapsInputsContainer">
             <div class="map-row">
               <strong>Map 1:</strong>
-              <input type="text" class="map-name-input" data-seed="1" placeholder="ชื่อแมพ & โหมด (เช่น Kosovo | Move 3')" required>
+              <input type="text" class="map-name-input" data-seed="1" placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
               <input type="text" class="map-url-input" data-seed="1" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 2:</strong>
-              <input type="text" class="map-name-input" data-seed="2" placeholder="ชื่อแมพ & โหมด (เช่น Kosovo | No move 2')" required>
+              <input type="text" class="map-name-input" data-seed="2" placeholder="ชื่อแมพ & โหมด (เช่น Asia | No move 2')" required>
               <input type="text" class="map-url-input" data-seed="2" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 3:</strong>
-              <input type="text" class="map-name-input" data-seed="3" placeholder="ชื่อแมพ & โหมด (เช่น Hallstatt Culture | NM 2')" required>
+              <input type="text" class="map-name-input" data-seed="3" placeholder="ชื่อแมพ & โหมด (เช่น Americas | NM 2')" required>
               <input type="text" class="map-url-input" data-seed="3" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 4:</strong>
-              <input type="text" class="map-name-input" data-seed="4" placeholder="ชื่อแมพ & โหมด (เช่น Fall | Move 3')" required>
+              <input type="text" class="map-name-input" data-seed="4" placeholder="ชื่อแมพ & โหมด (เช่น Africa | Move 3')" required>
               <input type="text" class="map-url-input" data-seed="4" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 5:</strong>
-              <input type="text" class="map-name-input" data-seed="5" placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
+              <input type="text" class="map-name-input" data-seed="5" placeholder="ชื่อแมพ & โหมด (เช่น World | Move 3')" required>
               <input type="text" class="map-url-input" data-seed="5" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 6:</strong>
-              <input type="text" class="map-name-input" data-seed="6" placeholder="ชื่อแมพ & โหมด (เช่น World | NMPZ 1')" required>
+              <input type="text" class="map-name-input" data-seed="6" placeholder="ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')" required>
               <input type="text" class="map-url-input" data-seed="6" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 7:</strong>
-              <input type="text" class="map-name-input" data-seed="7" placeholder="ชื่อแมพ & โหมด (เช่น AI Generation | NM 2')" required>
+              <input type="text" class="map-name-input" data-seed="7" placeholder="ชื่อแมพ & โหมด (เช่น AI Community | NM 2')" required>
               <input type="text" class="map-url-input" data-seed="7" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
           </div>
 
-          <button type="submit" class="btn" style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; background: var(--thai-red);">
+          <button type="submit" class="btn" style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; justify-content: center; background: var(--thai-red);">
             🚀 บันทึกและเปิดสัปดาห์แข่งขันใหม่
           </button>
         </form>
       </div>
-
-      <!-- รายการจัดการสัปดาห์ทั้งหมด -->
-      <div class="admin-card">
-        <h2 style="color: var(--navy-primary); font-size: 1.2rem; margin-bottom: 16px;">📋 จัดการสัปดาห์ทั้งหมด</h2>
-        <div id="weeksList">
-          <p style="color: #64748b;">กำลังโหลด...</p>
-        </div>
-      </div>
     </div>
 
+  </div>
+
+  <!-- 3. Modal แก้ไขข้อมูลสัปดาห์ & 7 Maps -->
+  <div id="editWeekModal" class="modal-backdrop">
+    <div class="edit-modal-box">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+        <h2 style="color: var(--navy-primary); font-size: 1.3rem;">✏️ แก้ไขข้อมูลสัปดาห์ & 7 Maps</h2>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+
+      <form id="editWeekForm">
+        <input type="hidden" id="editWeekId">
+        
+        <div class="form-group">
+          <label>ชื่อสัปดาห์ (Week Title):</label>
+          <input type="text" id="editWeekTitle" required>
+        </div>
+
+        <div class="form-group">
+          <label>ข้อความแถบข้อมูลด้านบน (Header Info Text):</label>
+          <input type="text" id="editWeekHeaderInfo">
+        </div>
+
+        <div class="form-group">
+          <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
+          <div style="display: flex; gap: 10px;">
+            <input type="datetime-local" id="editWeekEndDate">
+            <button type="button" class="btn" style="background: #64748b;" onclick="document.getElementById('editWeekEndDate').value=''">ล้างวันตัดรอบ</button>
+          </div>
+          <small style="color: #64748b;">(ถ้าล้างวันตัดรอบ ระบบจะไม่ Freeze อัตโนมัติ จนกว่าคุณจะมากดปุ่ม Freeze เอง)</small>
+        </div>
+
+        <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ แก้ไขรายชื่อและลิงก์ทั้ง 7 Maps:</h3>
+        <div id="editMapsContainer">
+          <!-- จะถูกสร้างผ่าน JS ทั้ง 7 แถว -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn" style="background: #94a3b8;" onclick="closeEditModal()">ยกเลิก</button>
+          <button type="submit" class="btn" style="background: var(--navy-primary);">💾 บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script src="config.js"></script>
