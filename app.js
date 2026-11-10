@@ -254,8 +254,8 @@ function renderMapCards(challenges) {
       return `
       <div class="map-card">
         <div>
-          <div class="map-title">Map ${c.seed_number} 🔗</div>
-          <div class="map-desc">${escapeHtml(c.name || `Seed ${c.seed_number}`)}</div>
+          <div class="map-title">Map ${c.seed_number}</div>
+          <div class="map-desc">${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}</div>
         </div>
         <a href="${c.url}" target="_blank" rel="noopener noreferrer" class="map-btn">
           ▶ Play Challenge
@@ -472,7 +472,7 @@ function renderRawScoresView() {
       const isSel = c.seed_number === selectedRawSeed;
       return `
         <button class="raw-map-pill ${isSel ? "active" : ""}" onclick="selectRawMapSeed(${c.seed_number})">
-          🗺️ Map ${c.seed_number}: ${escapeHtml(c.name || `Seed ${c.seed_number}`)}
+          🗺️ Map ${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}
         </button>
       `;
     })
@@ -531,6 +531,44 @@ window.selectRawMapSeed = function (seedNum) {
   selectedRawSeed = seedNum;
   renderRawScoresView();
 };
+
+/**
+ * Render Country Flag Emojis into real flag images using Flagcdn
+ * Fixes Windows OS issue where national flag emojis render as 2-letter codes (e.g. TH, UG, KE)
+ */
+function renderFlags(text) {
+  if (!text) return "";
+
+  // 1. UK Subdivisions: England, Scotland, Wales
+  text = text
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-eng.png" srcset="https://flagcdn.com/48x36/gb-eng.png 2x" width="20" height="15" alt="ENG" loading="lazy">')
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-sct.png" srcset="https://flagcdn.com/48x36/gb-sct.png 2x" width="20" height="15" alt="SCT" loading="lazy">')
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-wls.png" srcset="https://flagcdn.com/48x36/gb-wls.png 2x" width="20" height="15" alt="WLS" loading="lazy">');
+
+  // 2. Standard 2-letter country flag emojis (Regional Indicator Symbols U+1F1E6 to U+1F1FF)
+  const flagRegex = /\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]/g;
+  text = text.replace(flagRegex, (match) => {
+    const cp1 = match.codePointAt(0);
+    const cp2 = match.codePointAt(2);
+    const code = (
+      String.fromCharCode(65 + cp1 - 0x1f1e6) +
+      String.fromCharCode(65 + cp2 - 0x1f1e6)
+    ).toLowerCase();
+    return `<img class="flag-icon" src="https://flagcdn.com/24x18/${code}.png" srcset="https://flagcdn.com/48x36/${code}.png 2x" width="20" height="15" alt="${code.toUpperCase()}" loading="lazy">`;
+  });
+
+  // 3. Shortcodes like :th:, :flag_th:, :flag-th:
+  text = text.replace(/:flag[-_]([a-z]{2}):|:([a-z]{2}):/gi, (match, p1, p2) => {
+    let code = (p1 || p2).toLowerCase();
+    if (code === "uk") code = "gb";
+    return `<img class="flag-icon" src="https://flagcdn.com/24x18/${code}.png" srcset="https://flagcdn.com/48x36/${code}.png 2x" width="20" height="15" alt="${code.toUpperCase()}" loading="lazy">`;
+  });
+
+  return text;
+}
 
 function escapeHtml(text) {
   const div = document.createElement("div");

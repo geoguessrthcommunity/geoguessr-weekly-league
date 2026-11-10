@@ -139,7 +139,7 @@ async function loadWeeks() {
 
       const challengesList = (w.challenges || [])
         .sort((a, b) => a.seed_number - b.seed_number)
-        .map((c) => `<span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${c.seed_number}: ${escapeHtml(c.name || c.token)}</span>`)
+        .map((c) => `<span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${c.seed_number}: ${renderFlags(escapeHtml(c.name || c.token))}</span>`)
         .join(" ");
 
       return `
@@ -412,6 +412,36 @@ window.deleteWeek = async function (id, title) {
   await adminDb.from("weeks").delete().eq("id", id);
   loadWeeks();
 };
+
+function renderFlags(text) {
+  if (!text) return "";
+  text = text
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-eng.png" srcset="https://flagcdn.com/48x36/gb-eng.png 2x" width="20" height="15" alt="ENG" loading="lazy">')
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-sct.png" srcset="https://flagcdn.com/48x36/gb-sct.png 2x" width="20" height="15" alt="SCT" loading="lazy">')
+    .replace(/\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73\uDB40\uDC7F/g,
+      '<img class="flag-icon" src="https://flagcdn.com/24x18/gb-wls.png" srcset="https://flagcdn.com/48x36/gb-wls.png 2x" width="20" height="15" alt="WLS" loading="lazy">');
+
+  const flagRegex = /\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]/g;
+  text = text.replace(flagRegex, (match) => {
+    const cp1 = match.codePointAt(0);
+    const cp2 = match.codePointAt(2);
+    const code = (
+      String.fromCharCode(65 + cp1 - 0x1f1e6) +
+      String.fromCharCode(65 + cp2 - 0x1f1e6)
+    ).toLowerCase();
+    return `<img class="flag-icon" src="https://flagcdn.com/24x18/${code}.png" srcset="https://flagcdn.com/48x36/${code}.png 2x" width="20" height="15" alt="${code.toUpperCase()}" loading="lazy">`;
+  });
+
+  text = text.replace(/:flag[-_]([a-z]{2}):|:([a-z]{2}):/gi, (match, p1, p2) => {
+    let code = (p1 || p2).toLowerCase();
+    if (code === "uk") code = "gb";
+    return `<img class="flag-icon" src="https://flagcdn.com/24x18/${code}.png" srcset="https://flagcdn.com/48x36/${code}.png 2x" width="20" height="15" alt="${code.toUpperCase()}" loading="lazy">`;
+  });
+
+  return text;
+}
 
 function escapeHtml(text) {
   const div = document.createElement("div");
