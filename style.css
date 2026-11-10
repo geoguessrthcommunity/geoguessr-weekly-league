@@ -622,8 +622,8 @@ body {
 .rules-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 14px 0;
-  font-size: 0.9rem;
+  margin: 12px 0;
+  font-size: 0.86rem;
   background: white;
 }
 
@@ -631,13 +631,13 @@ body {
   background: #f1f5f9;
   color: #1e293b;
   font-weight: 700;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #cbd5e1;
   text-align: center;
 }
 
 .rules-table td {
-  padding: 9px 12px;
+  padding: 6px 10px;
   border: 1px solid #e2e8f0;
   text-align: center;
 }
