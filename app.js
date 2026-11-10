@@ -278,18 +278,13 @@ function calculateAndRenderScores(scores, challenges) {
         });
       }
 
-      // 2. รวมคะแนนสะสมของแมพ (ptsRounds)
+      // 2. รวมคะแนนประจำ Map = ผลรวมคะแนนที่ได้รับจากทั้ง 6 Rounds ย่อย
       pList.forEach((p) => {
         p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
+        p.ptsMap = p.ptsRounds; // คะแนนในตารางคือผลรวมของ 6 Rounds
       });
 
-      // 3. แปลงเป็น Points ประจำ Map (ptsMap) โดยเทียบ ptsRounds กับทุกคน
-      const allPtsRounds = pList.map((p) => p.ptsRounds);
-      pList.forEach((p) => {
-        p.ptsMap = allPtsRounds.filter((tot) => tot <= p.ptsRounds).length;
-      });
-
-      // 4. จัดอันดับใน Map (เรียงตาม ptsMap มากไปน้อย)
+      // 3. จัดอันดับใน Map (เรียงตาม ptsMap มากไปน้อย)
       pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
 
       pList.forEach((p, idx) => {
