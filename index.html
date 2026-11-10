@@ -110,53 +110,513 @@
       </div>
     </div>
 
-    <!-- 6. View 3: Rules & Scoring (Bilingual: English & Thai) -->
-    <div id="rulesView" style="display: none; background: white; border: 2px solid var(--gold-accent); padding: 30px; border-radius: 0 0 6px 6px;">
-      <h2 style="color: var(--navy-primary); margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
-        📜 Rules & Scoring / กฎและกติกาการคำนวณคะแนน
-      </h2>
-      <div style="line-height: 1.8; color: #334155; font-size: 0.95rem;">
-        
+    <!-- 6. View 3: Rules & Scoring (Bilingual: Thai & English with Toggle) -->
+    <div id="rulesView" style="display: none; background: white; border: 2px solid var(--gold-accent); padding: 28px; border-radius: 0 0 6px 6px;">
+      
+      <!-- Language Switcher Bar -->
+      <div class="rules-lang-switch">
+        <span class="rules-lang-label">🌐 Select Language / เลือกภาษา:</span>
+        <button type="button" id="btnRulesTh" class="rules-lang-btn active" onclick="setRulesLang('th')">
+          🇹🇭 ภาษาไทย
+        </button>
+        <button type="button" id="btnRulesEn" class="rules-lang-btn" onclick="setRulesLang('en')">
+          🇬🇧 English
+        </button>
+      </div>
+
+      <!-- ================= THAI RULES CONTENT ================= -->
+      <div id="rulesContentTh" class="rules-content-body">
+        <h2 style="color: var(--navy-primary); margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+          <span>📜</span> ทัวร์นาเมนต์ "GeoGuessr Thailand Weekly Challenges" — กฎและกติกาการแข่งขัน
+        </h2>
+
         <!-- Section 1 -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
-            1. Tournament Format / รูปแบบการแข่งขัน
-          </h3>
-          <p><strong>EN:</strong> Each week features <strong>7 Maps (7 Challenges)</strong>. Each map consists of 5 standard rounds (up to 5,000 points each) plus the overall raw total (up to 25,000 points), which is counted as a <strong>6th Round</strong>, giving 6 scored rounds in total per map.</p>
-          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> ในแต่ละสัปดาห์จะมีทั้งหมด 7 Maps (7 Challenges) แต่ละแมพมี 5 รอบปกติ (เต็ม 5,000) และคะแนนรวม 5 รอบ (เต็ม 25,000) นับเป็นรอบที่ 6 รวมเป็น 6 รอบย่อยในการคิดคะแนน</p>
+        <div class="rules-card">
+          <h3><span>🧭</span> 1. "GeoGuessr Thailand Weekly Challenges" คืออะไร และเข้าร่วมได้อย่างไร?</h3>
+          <p>
+            ในแต่ละสัปดาห์ ทุกคนสามารถเข้าร่วมการแข่งขัน <strong>GeoGuessr ประเภทเดี่ยว</strong> ได้อย่างอิสระ โดยคุณจะมีเวลา 1 สัปดาห์เต็มในการเล่นทั้งหมด <strong>7 แผนที่ (7 Challenges)</strong> เริ่มเปิดให้เล่นตั้งแต่วันศุกร์ จนถึงวันศุกร์ถัดไป เวลา <strong>21:00 น. (เวลาประเทศไทย ICT / UTC+7)</strong>
+          </p>
+          <div class="callout-box info" style="margin-top: 12px;">
+            <strong>📌 วิธีการเข้าร่วม:</strong> เพียงเข้าไปที่แท็บของสัปดาห์นั้น ๆ บนเว็บไซต์ แล้วคลิกลิงก์บนการ์ดแผนที่ด้านบน ซึ่งจะระบุชื่อแผนที่และโหมดการเล่นที่กำหนดไว้ เมื่อคุณเล่นจบครบทั้ง 5 รอบในแมพใดแมพหนึ่ง ระบบจะนำชื่อและคะแนนของคุณเข้าสู่ตารางอันดับอัตโนมัติทันที โดยตารางจะอัปเดตทุก ๆ 30 นาที (หากไม่มีข้อผิดพลาดจากระบบ)
+          </div>
+          <p style="margin-top: 12px;">
+            <strong>❄️ การสิ้นสุดสัปดาห์ & กำหนดการ Season 1:</strong> เมื่อจบอีเวนต์ในแต่ละสัปดาห์ (วันศุกร์ เวลา 21:00 น.) ระบบจะทำการ Freeze คะแนน และผู้เข้าร่วมแข่งขันทุกคนจะได้รับ <em>Season Points</em> สะสมตามลำดับอันดับที่ทำได้
+          </p>
+          <p style="margin-top: 8px;">
+            โดย <strong>Season 1</strong> นี้จะประกอบไปด้วยการแข่งขันทั้งหมด <strong>7 สัปดาห์</strong> ตั้งแต่วันศุกร์ที่ 14 พฤศจิกายน 2026 จนถึงวันศุกร์ที่ 1 มกราคม 2027 เมื่อจบ Season ผู้ที่ทำคะแนนรวมได้สูงสุดจะได้รับยศพิเศษภายใน Discord ชุมชน พร้อมของรางวัลพิเศษ!
+          </p>
+          <div class="callout-box" style="margin-top: 12px;">
+            <strong>⭐ ความสำคัญ:</strong> ทัวร์นาเมนต์ Weekly Challenges นี้ จะเป็นช่องทางสำคัญในการคัดเลือกเพื่อเข้าร่วมบางการแข่งขันหลักของ <strong>GeoGuessr Thailand Community ในอนาคต</strong>
+          </div>
         </div>
 
         <!-- Section 2 -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
-            2. Phantom Score Calculation (10% Threshold) / การคำนวณ Phantom Score (เกณฑ์ 10%)
-          </h3>
-          <div style="background: #f1f5f9; padding: 12px 18px; border-left: 4px solid var(--navy-primary); margin: 8px 0; font-family: monospace; font-size: 1rem;">
-            Phantom Score = Raw Score + 10% × (Max Score - Raw Score)
+        <div class="rules-card">
+          <h3><span>🗺️</span> 2. โปรแกรมการแข่งขันประจำสัปดาห์ (Weekly Program)</h3>
+          <p>
+            แผนที่ที่ใช้แข่งขันอยู่ในรูปแบบของ Challenges โดยทุกตำแหน่งในแต่ละแมพเป็นแผนที่ที่ถูก <strong>Handpick คัดเลือกอย่างตั้งใจในทุกตำแหน่งโดยทีมงาน</strong>
+          </p>
+          <p style="margin-top: 8px;">รายละเอียดแผนที่ทั้ง 7 ในแต่ละสัปดาห์มีโครงสร้างดังนี้:</p>
+
+          <div class="rules-program-grid">
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map1-color);">Map 1: Country</span>
+              <span class="map-desc">เจาะลึกเฉพาะประเทศใดประเทศหนึ่ง</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map2-color);">Map 2: Geographical Area</span>
+              <span class="map-desc">พื้นที่ทางภูมิศาสตร์หรือภูมิภาคเฉพาะ</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map3-color);">Map 3: 5Kable World | NM - 2'</span>
+              <span class="map-desc">No Move (หมุน/ซูมได้) เวลา 2 นาทีต่อรอบ</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map4-color);">Map 4: Non 5Kable Landscape | NM - 1'</span>
+              <span class="map-desc">No Move เน้นทิวทัศน์ธรรมชาติ เวลา 1 นาทีต่อรอบ</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map5-color);">Map 5: Non 5Kable Landscape | NMPZ - 1'</span>
+              <span class="map-desc">No Move, Pan, Zoom (ห้ามขยับห้ามหมุน) 1 นาทีต่อรอบ</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map6-color);">Map 6: World | Move - 3'</span>
+              <span class="map-desc">Moving (เดินสำรวจได้ทั่วโลก) 3 นาทีต่อรอบ</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map7-color);">Map 7: Special Theme or Special Game | ??? - ?'</span>
+              <span class="map-desc">ธีมพิเศษหรือโหมดการเล่นแปลกใหม่ตามโจทย์ประจำสัปดาห์</span>
+            </div>
           </div>
-          <p><strong>EN:</strong> In each round, your Phantom Score is compared against the raw scores of all players in that map. Your points for that round equal the number of players whose raw scores are &le; your Phantom Score (all players you beat or tied with).</p>
-          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> ในแต่ละรอบ คะแนนแฟนทอมจะถูกนำไปเทียบกับคะแนนดิบของผู้เล่นทุกคนในแมพ แต้มที่ได้รับคือจำนวนผู้เล่นที่คะแนนดิบ &le; คะแนนแฟนทอมของเรา (จำนวนคนที่ชนะหรือเสมอ)</p>
+
+          <p style="font-size: 0.9rem; color: #475569; margin-top: 10px;">
+            <em>*หมายเหตุการหมุนเวียน:* Country, Geographical Area, Special Theme/Game รวมถึงโหมดและเวลาจะเปลี่ยนแปลงไปทุกสัปดาห์ โดยในกลุ่ม 3 แมพนี้ (Map 1, 2, 7) ยืนยันว่าจะมีโหมด Move ไม่เกิน 1 แมพเสมอ</em>
+          </p>
+
+          <div class="callout-box info" style="margin-top: 14px;">
+            <strong>🧭 เคล็ดลับสำคัญเกี่ยวกับ Photosphere:</strong> ภาพ Photosphere ที่ไม่ใช่ของทางการ (Non-official photospheres) ตามค่าเริ่มต้นของระบบ GeoGuessr จะหันหน้าไปทาง <strong>ทิศเหนือจริง (True North)</strong> ในมุมมองแรกเกิด คุณสามารถกดปุ่ม <kbd>R</kbd> บนแป้นพิมพ์เพื่อ Reset มุมมองกลับมายังทิศเหนือเริ่มต้นนี้ได้ตลอดเวลา (หากสัปดาห์ใดไม่ได้ตั้งค่าให้หันไปทางทิศเหนือ ทีมงานจะแจ้งให้ทราบล่วงหน้าในข้อความประจำสัปดาห์)
+          </div>
         </div>
 
         <!-- Section 3 -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
-            3. Points per Map / คะแนนประจำ Map
-          </h3>
-          <p><strong>EN:</strong> The points earned from all 6 rounds are summed together to become your final <strong>Map Points</strong>. Map podium medals (🥇 🥈 🥉) are awarded based on Map Points.</p>
-          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> รวมแต้มที่ได้รับจากทั้ง 6 รอบย่อยเข้าด้วยกันเป็นคะแนน Points ประจำแมพนั้นทันที พร้อมแจกเหรียญรางวัลประจำแมพ (🥇 🥈 🥉)</p>
+        <div class="rules-card accent-red">
+          <h3><span>⚖️</span> 3. กฎระเบียบและความซื่อสัตย์ (Rules & Fair Play)</h3>
+          <p>
+            คุณจะต้องเล่นทุก Challenges <strong>ด้วยตัวเองเพียงลำพังและด้วยความโปร่งใส</strong>
+          </p>
+          <ul style="margin: 10px 0 10px 24px; line-height: 1.8;">
+            <li><strong>ห้ามรับความช่วยเหลือจากภายนอกทุกชนิด:</strong> ห้ามใช้ Search Engine (Google, Bing ฯลฯ), ห้ามให้ผู้อื่นช่วยหาตำแหน่ง, และห้ามใช้โปรแกรมโกง</li>
+            <li><strong>ห้ามใช้ Script / Third-party Extensions:</strong> ห้ามใช้ส่วนเสริมเบราว์เซอร์หรือสคริปต์ (เช่น Tampermonkey scripts, auto-guessers) ที่นำมาซึ่งความได้เปรียบผู้อื่นทุกชนิด</li>
+            <li><strong>ข้อมูลที่อนุญาตให้ใช้:</strong> คุณสามารถใช้ได้เฉพาะข้อมูล สภาพแวดล้อม ป้ายบอกทาง และองค์ประกอบที่ปรากฏอยู่บนหน้าเว็บ GeoGuessr ในรอบนั้น ๆ เท่านั้นเพื่อคาดเดาตำแหน่ง</li>
+            <li><em>*ข้อยกเว้นพิเศษ:</em> ในบาง Special Game ทางทีมงานอาจอนุญาตให้คุณใช้เครื่องมือเสริมพิเศษได้ เช่น ใช้นิ้วมือทาบหน้าจอ, ใช้ไม้บรรทัดวัดระยะ, หรือใช้โปรแกรม Notepad ช่วยจดบันทึก โดยจะมีการระบุไว้ชัดเจนในสัปดาห์นั้น ๆ</li>
+          </ul>
         </div>
 
         <!-- Section 4 -->
-        <div>
-          <h3 style="color: #0f172a; margin-bottom: 6px; font-size: 1.1rem;">
-            4. Total Weekly Points & Standings / คะแนนรวมประจำสัปดาห์
-          </h3>
-          <p><strong>EN:</strong> Points from all 7 Maps are summed together to determine the overall weekly leaderboard standings and overall podium medals (🥇 🥈 🥉).</p>
-          <p style="color: #64748b; margin-top: 4px;"><strong>TH:</strong> นำ Points จากทั้ง 7 Maps มารวมกันเพื่อจัดอันดับคะแนนรวมสุดท้ายประจำสัปดาห์</p>
+        <div class="rules-card">
+          <h3><span>📺</span> 4. มารยาทการสตรีมและผู้ชม (Streaming & Spectator Etiquette)</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 6px;">
+              <strong style="color: var(--navy-primary);">🎙️ สำหรับสตรีมเมอร์ (Streamers):</strong>
+              <p style="margin-top: 6px; font-size: 0.9rem;">
+                สามารถไลฟ์สตรีมการเล่นทัวร์นาเมนต์ได้ตามอัธยาศัย แต่โปรดระบุในชื่อสตรีมให้ชัดเจนว่ากำลังเล่น <em>Weekly Challenges</em> (เช่น ติดป้าย Spoilers) เพื่อแจ้งเตือนผู้ชมที่อาจต้องการลงแข่งว่าอาจถูกสปอยล์ข้อมูลตำแหน่งได้
+              </p>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 6px;">
+              <strong style="color: var(--thai-red);">👀 สำหรับผู้ชม (Viewers):</strong>
+              <p style="margin-top: 6px; font-size: 0.9rem;">
+                หากคุณมีเป้าหมายที่จะเข้าร่วมแข่งขันในสัปดาห์นั้น ขอความร่วมมือเล่นแผนที่ประจำสัปดาห์ทั้งหมดให้เสร็จสิ้นด้วยตนเองก่อนที่จะเข้าไปรับชมสตรีมเมอร์เล่น
+              </p>
+            </div>
+          </div>
         </div>
 
+        <!-- Section 5 -->
+        <div class="rules-card accent-gold">
+          <h3><span>📊</span> 5. ระบบการคิดคะแนน: "GeoGuessr La Ligue" Round-by-Round (Phantom Score)</h3>
+          <p>
+            การคิดคะแนนจะใช้ระบบระดับมาตรฐานสากลแบบเดียวกับ <strong>"GeoGuessr La Ligue"</strong> นั่นคือระบบ <strong>Round-by-Round Score (Phantom Score)</strong>
+          </p>
+          <p style="margin-top: 8px;">
+            ในแต่ละแผนที่ (Map) จะประกอบไปด้วย <strong>6 รอบย่อยในการคิดคะแนน (6 Scored Rounds)</strong>:
+          </p>
+          <ul style="margin: 6px 0 10px 24px; line-height: 1.7;">
+            <li><strong>รอบที่ 1 ถึง 5:</strong> รอบการเล่นปกติ 5 รอบ (คะแนนดิบเต็มรอบละ 5,000 คะแนน)</li>
+            <li><strong>รอบที่ 6:</strong> คะแนนรวมของทั้ง 5 รอบ (Total Raw Score เต็ม 25,000 คะแนน) นับเป็นรอบย่อยที่ 6</li>
+          </ul>
+
+          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🧮 สูตรการคำนวณ Phantom Score (เกณฑ์ผ่อนปรน 10%):</h4>
+          <div class="rules-formula-box">
+            Phantom Score = คะแนนดิบ (Raw Score) + 10% × (คะแนนเต็มในรอบนั้น - คะแนนดิบ)
+          </div>
+          <ul style="margin: 8px 0 12px 24px; font-size: 0.92rem; color: #334155;">
+            <li><strong>สำหรับรอบปกติ 1–5 (เต็ม 5,000):</strong> นำคะแนนที่ขาดไปจาก 5,000 มาคูณ 10% แล้วบวกคืนเข้าคะแนนดิบ เช่น ได้คะแนนดิบ 4,500 ขาดอีก 500 คะแนน จะได้บวก 50 &rarr; <em>Phantom Score = 4,550</em></li>
+            <li><strong>สำหรับรอบที่ 6 (เต็ม 25,000):</strong> นำคะแนนที่ขาดไปจาก 25,000 มาคูณ 10% แล้วบวกคืนเข้าคะแนนดิบ เช่น ได้คะแนนดิบ 20,000 ขาดอีก 5,000 คะแนน จะได้บวก 500 &rarr; <em>Phantom Score = 20,500</em></li>
+          </ul>
+
+          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🎯 การแปลงเป็นแต้มประจำรอบ (Round Points):</h4>
+          <p>
+            ในแต่ละรอบ คะแนน Phantom Score ของคุณจะถูกนำไปเปรียบเทียบกับ <strong>คะแนนดิบ (Raw Scores) ของผู้เล่นทุกคน</strong> ในแมพนั้น<br>
+            <strong>แต้มที่คุณได้รับในรอบนั้น = จำนวนผู้เล่นที่มีคะแนนดิบ &le; Phantom Score ของคุณ</strong> (นับรวมคนที่คุณชนะ และคนที่เสมอกับคุณในระยะเกณฑ์ผ่อนปรน 10%)
+          </p>
+          <p style="margin-top: 8px;">
+            เมื่อเล่นครบทั้ง 6 รอบย่อย แต้มประจำรอบจะถูกนำมารวมกันเป็น <strong>Map Points</strong> ของแผนที่นั้น และเมื่อรวม Map Points ทั้ง 7 แผนที่เข้าด้วยกัน จะได้เป็นคะแนนรวมประจำสัปดาห์ในตาราง Leaderboard!
+          </p>
+
+          <h4 style="color: var(--navy-primary); margin: 20px 0 8px 0; font-size: 1rem;">💡 ตารางตัวอย่างการคำนวณจริง (สมมติผู้เล่น 4 คนในรอบปกติ เต็ม 5,000 คะแนน):</h4>
+          <div style="overflow-x: auto;">
+            <table class="rules-table">
+              <thead>
+                <tr>
+                  <th style="width: 130px;">ผู้เล่น (Player)</th>
+                  <th style="width: 100px;">คะแนนดิบ (Raw)</th>
+                  <th style="width: 90px;">คะแนนที่ขาด</th>
+                  <th style="width: 100px;">โบนัส 10%</th>
+                  <th style="width: 130px; background: #eff6ff; color: #1e3a8a;">Phantom Score</th>
+                  <th style="text-align: left; padding-left: 14px;">คะแนนดิบที่ชนะหรือเสมอ (&le; Phantom)</th>
+                  <th style="width: 90px; background: #00247d; color: white;">แต้มรอบนี้</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>🥇 ผู้เล่น A</strong></td>
+                  <td><strong>4,950</strong></td>
+                  <td>50</td>
+                  <td>+5</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,955</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ A (4,950), B (4,920), C (4,500), D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">4 แต้ม</td>
+                </tr>
+                <tr>
+                  <td><strong>🥈 ผู้เล่น B</strong></td>
+                  <td><strong>4,920</strong></td>
+                  <td>80</td>
+                  <td>+8</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,928</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ B (4,920), C (4,500), D (3,000) <em>(แพ้ดิบ A 4,950)</em></td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">3 แต้ม</td>
+                </tr>
+                <tr>
+                  <td><strong>🥉 ผู้เล่น C</strong></td>
+                  <td><strong>4,500</strong></td>
+                  <td>500</td>
+                  <td>+50</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,550</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ C (4,500), D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">2 แต้ม</td>
+                </tr>
+                <tr>
+                  <td><strong>ผู้เล่น D</strong></td>
+                  <td><strong>3,000</strong></td>
+                  <td>2,000</td>
+                  <td>+200</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">3,200</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">1 แต้ม</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">
+            *หมายเหตุ: ระบบ Phantom Score ช่วยป้องกันความเหลื่อมล้ำจากความคลาดเคลื่อนเพียงระดับพิกเซลหรือเมตร ทำให้การแข่งขันยุติธรรมและสนุกยิ่งขึ้น!
+          </p>
+        </div>
+
+        <!-- Section 6 -->
+        <div class="rules-card">
+          <h3><span>🏆</span> 6. การคิดคะแนนสะสมของ Season (Season Points Distribution)</h3>
+          <p>
+            ในแต่ละสัปดาห์ ผู้ที่เล่น Challenges ทุกคนจะได้รับคะแนนสะสม Season Points ตามจำนวนผู้เข้าร่วมแข่งขันทั้งหมด (กำหนดให้มีจำนวนผู้เล่นทั้งหมดเท่ากับ <strong>N</strong> คน) ตามเกณฑ์ดังต่อไปนี้:
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 14px 0;">
+            <div style="background: #fef3c7; border: 1px solid #fde68a; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #92400e;">
+              🥇 อันดับ 1 : N + 5 แต้ม
+            </div>
+            <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #334155;">
+              🥈 อันดับ 2 : N + 2 แต้ม
+            </div>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #991b1b;">
+              🥉 อันดับ 3 : N - 1 แต้ม
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              อันดับ 4 : N - 3 แต้ม
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              อันดับ 5 : N - 4 แต้ม
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              อันดับ k (k &ge; 5) : N - k + 1 แต้ม
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              อันดับสุดท้าย (k = N) : 1 แต้ม
+            </div>
+          </div>
+          <p style="font-size: 0.9rem; color: #475569; margin-top: 6px;">
+            <strong>ตัวอย่าง:</strong> หากสัปดาห์นั้นมีผู้เข้าร่วมเล่นทั้งหมด <strong>N = 25 คน</strong> &rarr; อันดับ 1 ได้ 30 แต้ม, อันดับ 2 ได้ 27 แต้ม, อันดับ 3 ได้ 24 แต้ม, อันดับ 4 ได้ 22 แต้ม, อันดับ 5 ได้ 21 แต้ม ... และอันดับที่ 25 (อันดับสุดท้าย) ได้ 1 แต้ม
+          </p>
+        </div>
+
+        <!-- Section 7 -->
+        <div class="rules-card accent-gold">
+          <h3><span>🎁</span> 7. รางวัลสำหรับ Season 1 (Season 1 Rewards)</h3>
+          <ul style="margin: 8px 0 12px 24px; line-height: 2;">
+            <li>🥇 <strong>อันดับ 1 (Champion):</strong> Role พิเศษประจำ Season 1 ใน Discord "GeoGuessr Thailand" + ของรางวัลพิเศษ (TBA จะประกาศให้ทราบภายหลัง)</li>
+            <li>🥈 <strong>อันดับ 2 (Runner-up):</strong> Role พิเศษประจำ Season 1 ใน Discord "GeoGuessr Thailand"</li>
+            <li>🥉 <strong>อันดับ 3 (3rd Place):</strong> Role พิเศษประจำ Season 1 ใน Discord "GeoGuessr Thailand"</li>
+          </ul>
+          <p style="font-size: 0.92rem; color: #475569;">
+            นอกจากนี้ ผู้ที่ทำผลงานโดดเด่นตลอด Season จะได้รับสิทธิ์และโควตาพิเศษในการเข้าร่วมการแข่งขันระดับเมเจอร์ของชุมชนในอนาคต!
+          </p>
+        </div>
       </div>
+
+
+      <!-- ================= ENGLISH RULES CONTENT ================= -->
+      <div id="rulesContentEn" class="rules-content-body" style="display: none;">
+        <h2 style="color: var(--navy-primary); margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+          <span>📜</span> "GeoGuessr Thailand Weekly Challenges" — Official Rules & Scoring System
+        </h2>
+
+        <!-- Section 1 -->
+        <div class="rules-card">
+          <h3><span>🧭</span> 1. What is "GeoGuessr Thailand Weekly Challenges" & How to Participate?</h3>
+          <p>
+            Every week, everyone is welcome to participate in the <strong>GeoGuessr Solo Tournament</strong>. You have 1 full week to complete all <strong>7 Maps (7 Challenges)</strong>, running from Friday until the following Friday at <strong>21:00 ICT (UTC+7)</strong>.
+          </p>
+          <div class="callout-box info" style="margin-top: 12px;">
+            <strong>📌 How to Join:</strong> Simply navigate to the active week's tab on this website and click the challenge links in the cards at the top. Each card outlines the map name, game mode, and timer. Once you complete all 5 rounds on any map, our system automatically places you on the live leaderboard. The leaderboard synchronizes automatically every 30 minutes.
+          </div>
+          <p style="margin-top: 12px;">
+            <strong>❄️ Weekly Freezing & Season 1 Schedule:</strong> At 21:00 ICT each Friday, scores are frozen, and all participants receive <em>Season Points</em> based on their final weekly rank.
+          </p>
+          <p style="margin-top: 8px;">
+            <strong>Season 1</strong> spans <strong>7 consecutive weeks</strong>, running from Friday, November 14, 2026 to Friday, January 1, 2027. At the end of the season, top-performing players will receive exclusive roles in our community Discord server, along with special winner rewards!
+          </p>
+          <div class="callout-box" style="margin-top: 12px;">
+            <strong>⭐ Future Pathway:</strong> This tournament serves as a premier qualification pathway for upcoming major tournaments within the <strong>GeoGuessr Thailand Community</strong>!
+          </div>
+        </div>
+
+        <!-- Section 2 -->
+        <div class="rules-card">
+          <h3><span>🗺️</span> 2. Weekly Competition Program (7 Maps)</h3>
+          <p>
+            All tournament maps are played in Challenge mode. Every location across all maps has been <strong>meticulously handpicked by our curating team</strong>.
+          </p>
+          <p style="margin-top: 8px;">The standard 7-map weekly lineup consists of:</p>
+
+          <div class="rules-program-grid">
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map1-color);">Map 1: Country</span>
+              <span class="map-desc">Dedicated single-country exploration</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map2-color);">Map 2: Geographical Area</span>
+              <span class="map-desc">Regional or cross-border geographical terrain</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map3-color);">Map 3: 5Kable World | NM - 2'</span>
+              <span class="map-desc">No Move (panning & zooming allowed), 2 mins/round</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map4-color);">Map 4: Non 5Kable Landscape | NM - 1'</span>
+              <span class="map-desc">No Move, natural landscapes & biomes, 1 min/round</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map5-color);">Map 5: Non 5Kable Landscape | NMPZ - 1'</span>
+              <span class="map-desc">No Move, Pan, or Zoom (pure instinct), 1 min/round</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map6-color);">Map 6: World | Move - 3'</span>
+              <span class="map-desc">Moving allowed (worldwide navigation), 3 mins/round</span>
+            </div>
+            <div class="rules-map-pill">
+              <span class="map-title" style="color: var(--map7-color);">Map 7: Special Theme or Special Game | ??? - ?'</span>
+              <span class="map-desc">Weekly rotating creative theme, riddle, or special mechanics</span>
+            </div>
+          </div>
+
+          <p style="font-size: 0.9rem; color: #475569; margin-top: 10px;">
+            <em>*Rotation Note:* Country, Geographical Area, and Special Theme/Game as well as their game modes and timers change each week. Across Maps 1, 2, and 7, it is guaranteed that <strong>no more than 1 map will feature Moving mode</strong>.</em>
+          </p>
+
+          <div class="callout-box info" style="margin-top: 14px;">
+            <strong>🧭 Photosphere True North Orientation Tip:</strong> By default in GeoGuessr, non-official user photospheres spawn facing <strong>True North</strong> in their initial camera view. You can press <kbd>R</kbd> on your keyboard at any time to reset your camera back to this initial orientation. (If any week's photospheres are deliberately not aligned to True North, an announcement will be made at the beginning of that week).
+          </div>
+        </div>
+
+        <!-- Section 3 -->
+        <div class="rules-card accent-red">
+          <h3><span>⚖️</span> 3. Integrity & Fair Play Rules</h3>
+          <p>
+            All challenges must be played <strong>solo, honestly, and in complete transparency</strong>.
+          </p>
+          <ul style="margin: 10px 0 10px 24px; line-height: 1.8;">
+            <li><strong>Strict Prohibition of Outside Help:</strong> No search engines (Google, Bing, etc.), no outside collaborators, and no third-party assistance.</li>
+            <li><strong>No Unauthorized Scripts or Extensions:</strong> Any browser scripts or third-party extensions (e.g. Tampermonkey scripts, auto-guessers) that grant an unfair advantage over other players are strictly forbidden.</li>
+            <li><strong>Allowed Information:</strong> You may only use the visual clues, road signs, environment, and elements present within the official GeoGuessr webpage during that specific round.</li>
+            <li><em>*Special Game Exceptions:</em> In certain designated Special Games, the team may explicitly permit auxiliary tools (such as using fingers on the screen, physical ruler, or taking notes in Notepad).</li>
+          </ul>
+        </div>
+
+        <!-- Section 4 -->
+        <div class="rules-card">
+          <h3><span>📺</span> 4. Streaming & Spectator Etiquette</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 6px;">
+              <strong style="color: var(--navy-primary);">🎙️ For Streamers:</strong>
+              <p style="margin-top: 6px; font-size: 0.9rem;">
+                Live streaming your tournament games is warmly welcomed! However, please clearly indicate in your stream title that you are playing the weekly challenges (e.g., adding a spoiler alert tag) to prevent spoiling viewers who may still want to compete.
+              </p>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 6px;">
+              <strong style="color: var(--thai-red);">👀 For Viewers:</strong>
+              <p style="margin-top: 6px; font-size: 0.9rem;">
+                If you intend to participate in that week's competition, please finish playing all 7 challenge maps yourself before watching any streamer play them.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5 -->
+        <div class="rules-card accent-gold">
+          <h3><span>📊</span> 5. Scoring System: "GeoGuessr La Ligue" Round-by-Round (Phantom Score)</h3>
+          <p>
+            Scoring follows the international standard modeled after <strong>"GeoGuessr La Ligue"</strong>, utilizing a <strong>Round-by-Round Phantom Score</strong> system.
+          </p>
+          <p style="margin-top: 8px;">
+            Each map consists of <strong>6 Scored Rounds</strong>:
+          </p>
+          <ul style="margin: 6px 0 10px 24px; line-height: 1.7;">
+            <li><strong>Rounds 1 through 5:</strong> Standard gameplay rounds (maximum 5,000 raw points each).</li>
+            <li><strong>Round 6:</strong> Overall Raw Total of all 5 rounds combined (maximum 25,000 raw points), evaluated as a standalone 6th round.</li>
+          </ul>
+
+          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🧮 Phantom Score Formula (10% Threshold):</h4>
+          <div class="rules-formula-box">
+            Phantom Score = Raw Score + 10% × (Max Round Score - Raw Score)
+          </div>
+          <ul style="margin: 8px 0 12px 24px; font-size: 0.92rem; color: #334155;">
+            <li><strong>Standard Rounds 1–5 (Max 5,000):</strong> Missing points from 5,000 &times; 10% are added back to your raw score. (e.g., Raw score of 4,500 misses 500 &rarr; 10% bonus is +50 &rarr; <em>Phantom Score = 4,550</em>).</li>
+            <li><strong>Round 6 Total (Max 25,000):</strong> Missing points from 25,000 &times; 10% are added back to your raw score. (e.g., Raw score of 20,000 misses 5,000 &rarr; 10% bonus is +500 &rarr; <em>Phantom Score = 20,500</em>).</li>
+          </ul>
+
+          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🎯 Round Points Calculation:</h4>
+          <p>
+            In every round, your Phantom Score is compared against the <strong>Raw Scores of all players</strong> in that map.<br>
+            <strong>Points earned in that round = Number of players whose raw score is &le; your Phantom Score</strong> (all players you beat plus players within your 10% phantom tie window).
+          </p>
+          <p style="margin-top: 8px;">
+            Your points across all 6 rounds are summed into your <strong>Map Points</strong>. Finally, summing Map Points across all 7 maps gives your overall score on the weekly master leaderboard!
+          </p>
+
+          <h4 style="color: var(--navy-primary); margin: 20px 0 8px 0; font-size: 1rem;">💡 Illustrative Calculation Example (4 Players in a 5,000-pt Standard Round):</h4>
+          <div style="overflow-x: auto;">
+            <table class="rules-table">
+              <thead>
+                <tr>
+                  <th style="width: 130px;">Player</th>
+                  <th style="width: 100px;">Raw Score</th>
+                  <th style="width: 90px;">Missing</th>
+                  <th style="width: 100px;">10% Bonus</th>
+                  <th style="width: 130px; background: #eff6ff; color: #1e3a8a;">Phantom Score</th>
+                  <th style="text-align: left; padding-left: 14px;">Raw Scores Beaten or Tied (&le; Phantom)</th>
+                  <th style="width: 90px; background: #00247d; color: white;">Round Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>🥇 Player A</strong></td>
+                  <td><strong>4,950</strong></td>
+                  <td>50</td>
+                  <td>+5</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,955</td>
+                  <td style="text-align: left; padding-left: 14px;">Beats Raw A (4,950), B (4,920), C (4,500), D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">4 pts</td>
+                </tr>
+                <tr>
+                  <td><strong>🥈 Player B</strong></td>
+                  <td><strong>4,920</strong></td>
+                  <td>80</td>
+                  <td>+8</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,928</td>
+                  <td style="text-align: left; padding-left: 14px;">Beats Raw B (4,920), C (4,500), D (3,000) <em>(Raw A 4,950 is higher)</em></td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">3 pts</td>
+                </tr>
+                <tr>
+                  <td><strong>🥉 Player C</strong></td>
+                  <td><strong>4,500</strong></td>
+                  <td>500</td>
+                  <td>+50</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,550</td>
+                  <td style="text-align: left; padding-left: 14px;">Beats Raw C (4,500), D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">2 pts</td>
+                </tr>
+                <tr>
+                  <td><strong>Player D</strong></td>
+                  <td><strong>3,000</strong></td>
+                  <td>2,000</td>
+                  <td>+200</td>
+                  <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">3,200</td>
+                  <td style="text-align: left; padding-left: 14px;">Beats Raw D (3,000)</td>
+                  <td style="font-weight: bold; color: #15803d; font-size: 1.05rem;">1 pt</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">
+            *Note: The Phantom Score mitigates trivial pixel/millimeter differences, rewarding round-by-round consistency and fair competition!
+          </p>
+        </div>
+
+        <!-- Section 6 -->
+        <div class="rules-card">
+          <h3><span>🏆</span> 6. Season Points Distribution</h3>
+          <p>
+            At the conclusion of each week, all participants receive cumulative Season Points according to the total participant count (denoted as <strong>N</strong> players):
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 14px 0;">
+            <div style="background: #fef3c7; border: 1px solid #fde68a; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #92400e;">
+              🥇 1st Place : N + 5 pts
+            </div>
+            <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #334155;">
+              🥈 2nd Place : N + 2 pts
+            </div>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 10px 14px; border-radius: 6px; font-weight: bold; color: #991b1b;">
+              🥉 3rd Place : N - 1 pt
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              4th Place : N - 3 pts
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              5th Place : N - 4 pts
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              Rank k (k &ge; 5) : N - k + 1 pts
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; font-weight: 600; color: #475569;">
+              Last Place (k = N) : 1 pt
+            </div>
+          </div>
+          <p style="font-size: 0.9rem; color: #475569; margin-top: 6px;">
+            <strong>Example:</strong> With <strong>N = 25 players</strong> &rarr; 1st = 30 pts, 2nd = 27 pts, 3rd = 24 pts, 4th = 22 pts, 5th = 21 pts ... and 25th (last) = 1 pt.
+          </p>
+        </div>
+
+        <!-- Section 7 -->
+        <div class="rules-card accent-gold">
+          <h3><span>🎁</span> 7. Season 1 Rewards</h3>
+          <ul style="margin: 8px 0 12px 24px; line-height: 2;">
+            <li>🥇 <strong>1st Place (Champion):</strong> Exclusive Discord Role in "GeoGuessr Thailand" + Special Winner Reward (TBA)</li>
+            <li>🥈 <strong>2nd Place (Runner-up):</strong> Exclusive Discord Role in "GeoGuessr Thailand"</li>
+            <li>🥉 <strong>3rd Place (3rd Place):</strong> Exclusive Discord Role in "GeoGuessr Thailand"</li>
+          </ul>
+          <p style="font-size: 0.92rem; color: #475569;">
+            Top finishers across the season will also receive priority seeding and invitation to major upcoming community tournaments!
+          </p>
+        </div>
+      </div>
+
     </div>
   </div>
 

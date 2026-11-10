@@ -491,3 +491,206 @@ body {
   background: white;
   color: var(--thai-red);
 }
+
+/* ====================================================================
+   Rules View & Bilingual Toggle Styling
+   ==================================================================== */
+.rules-lang-switch {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.rules-lang-label {
+  font-size: 0.88rem;
+  color: #64748b;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.rules-lang-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.rules-lang-btn:hover {
+  background: #e2e8f0;
+  color: var(--navy-primary);
+}
+
+.rules-lang-btn.active {
+  background: var(--navy-primary);
+  color: white;
+  border-color: var(--navy-primary);
+  box-shadow: 0 2px 4px rgba(0, 36, 125, 0.25);
+}
+
+.rules-content-body {
+  line-height: 1.8;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.rules-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid var(--navy-primary);
+  border-radius: 8px;
+  padding: 22px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rules-card.accent-gold {
+  border-left-color: var(--gold-accent);
+}
+
+.rules-card.accent-red {
+  border-left-color: var(--thai-red);
+}
+
+.rules-card h3 {
+  color: #0f172a;
+  font-size: 1.15rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rules-program-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.rules-map-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rules-map-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+}
+
+.rules-map-pill .map-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.rules-map-pill .map-desc {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.rules-formula-box {
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 14px 18px;
+  border-radius: 6px;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 12px 0;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  overflow-x: auto;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.rules-table th {
+  background: #f1f5f9;
+  color: #1e293b;
+  font-weight: 700;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  text-align: center;
+}
+
+.rules-table td {
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.rules-table tr:hover {
+  background: #f8fafc;
+}
+
+.callout-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin: 12px 0;
+  font-size: 0.92rem;
+  color: #166534;
+  line-height: 1.6;
+}
+
+.callout-box.warning {
+  background: #fef2f2;
+  border-color: #fecaca;
+  border-left-color: var(--thai-red);
+  color: #991b1b;
+}
+
+.callout-box.info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  border-left-color: var(--navy-primary);
+  color: #1e40af;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .rules-lang-switch {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .rules-card {
+    padding: 16px;
+  }
+}

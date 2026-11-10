@@ -75,6 +75,14 @@ async function init() {
 
     const defaultWeek = weeks.find((w) => w.is_active) || weeks[0];
     await selectWeek(defaultWeek.id);
+
+    // Restore saved rules language preference if any
+    try {
+      const savedLang = localStorage.getItem("rules_lang");
+      if (savedLang === "en") {
+        setRulesLang("en");
+      }
+    } catch (e) {}
   } catch (err) {
     console.error("Init Error:", err);
   }
@@ -198,6 +206,37 @@ window.switchTab = function (tabName) {
     rawScoresView.style.display = "none";
     viewSwitchBar.style.display = "none";
     rulesView.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+};
+
+/**
+ * 5.1 Toggle Rules Language between Thai ('th') and English ('en')
+ */
+window.setRulesLang = function (lang) {
+  const btnTh = document.getElementById("btnRulesTh");
+  const btnEn = document.getElementById("btnRulesEn");
+  const rulesTh = document.getElementById("rulesContentTh");
+  const rulesEn = document.getElementById("rulesContentEn");
+
+  if (!rulesTh || !rulesEn) return;
+
+  if (lang === "en") {
+    rulesTh.style.display = "none";
+    rulesEn.style.display = "block";
+    btnEn?.classList.add("active");
+    btnTh?.classList.remove("active");
+    try {
+      localStorage.setItem("rules_lang", "en");
+    } catch (e) {}
+  } else {
+    rulesTh.style.display = "block";
+    rulesEn.style.display = "none";
+    btnTh?.classList.add("active");
+    btnEn?.classList.remove("active");
+    try {
+      localStorage.setItem("rules_lang", "th");
+    } catch (e) {}
   }
 };
 
