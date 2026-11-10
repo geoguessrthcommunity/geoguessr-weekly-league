@@ -30,7 +30,6 @@
     <div class="top-section">
       <!-- กล่องใส่โลโก้ -->
       <div class="logo-container">
-        <!-- ถ้ามีไฟล์ logo.png จะแสดงรูป ถ้ายังไม่มีจะแสดงกล่องข้อความจำลอง -->
         <img id="leagueLogo" src="logo.png" class="logo-img" alt="League Logo" 
              onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
         <div id="logoPlaceholder" class="logo-placeholder" style="display: none;">
@@ -47,8 +46,19 @@
       </div>
     </div>
 
-    <!-- 3. ตารางคะแนนสไตล์ Excel / Google Sheets -->
-    <div class="table-wrapper">
+    <!-- 3. แถบสลับมุมมอง (Sub-tabs สลับตารางคะแนนรวม กับ รายละเอียดคะแนนดิบ) -->
+    <div class="view-switch-bar">
+      <button id="viewBtnLeaderboard" class="view-tab-btn active" onclick="switchMainView('leaderboard')">
+        🏆 ตารางคะแนนรวม (Leaderboard)
+      </button>
+      <button id="viewBtnRaw" class="view-tab-btn" onclick="switchMainView('raw')">
+        📊 รายละเอียดคะแนนดิบ (Raw Scores)
+        <span id="rawLockBadge" class="lock-pill">🔒 จบวีคถึงจะดูได้</span>
+      </button>
+    </div>
+
+    <!-- 4. มุมมองที่ 1: ตารางคะแนนหลัก (Leaderboard View) -->
+    <div id="leaderboardView" class="table-wrapper">
       <table class="sheets-table">
         <thead>
           <tr id="tableTopHeaderRow">
@@ -63,7 +73,7 @@
         </thead>
         <tbody id="scoresTableBody">
           <tr>
-            <td colspan="17" style="padding: 40px; color: #64748b;">
+            <td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">
               กำลังคำนวณคะแนน Phantom Score (10% Threshold)...
             </td>
           </tr>
@@ -71,7 +81,49 @@
       </table>
     </div>
 
-    <!-- ส่วนเนื้อหาหน้ารหัสกติกา (แสดงเมื่อคลิกแท็บ Rules) -->
+    <!-- 5. มุมมองที่ 2: ตารางคะแนนดิบแยกราย Round (Raw Scores View) -->
+    <div id="rawScoresView" style="display: none;">
+      <!-- กรณีสัปดาห์ยังไม่จบ (ล็อกอยู่) -->
+      <div id="rawLockedNotice" class="locked-card">
+        <div style="font-size: 3rem; margin-bottom: 12px;">🔒</div>
+        <h2 style="color: var(--navy-primary); margin-bottom: 8px;">สัปดาห์นี้กำลังแข่งขันอยู่</h2>
+        <p style="color: #64748b; max-width: 500px; margin: 0 auto; line-height: 1.6;">
+          รายละเอียดคะแนนดิบราย Round และคะแนน Phantom Score จะถูกปลดล็อกให้ดูในหน้านี้เมื่อสัปดาห์นี้สิ้นสุดการแข่งขัน (Freeze) แล้วเท่านั้น เพื่อความยุติธรรมของผู้เข้าแข่งขัน
+        </p>
+      </div>
+
+      <!-- กรณีสัปดาห์จบแล้ว (ปลดล็อกให้ดูตารางเต็ม) -->
+      <div id="rawContent" class="table-wrapper" style="display: none;">
+        <!-- แถบเลือก Map 1 ถึง 7 -->
+        <div class="raw-controls-bar">
+          <strong style="color: #475569; font-size: 0.9rem; margin-right: 6px;">เลือก Map:</strong>
+          <div id="rawMapSelectorPills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <!-- Pills จะถูกสร้างผ่าน JS -->
+          </div>
+        </div>
+
+        <table class="sheets-table">
+          <thead>
+            <tr>
+              <th style="width: 60px;">#</th>
+              <th style="text-align: left; padding-left: 12px; width: 180px;">Pseudo</th>
+              <th style="width: 100px;">Round 1</th>
+              <th style="width: 100px;">Round 2</th>
+              <th style="width: 100px;">Round 3</th>
+              <th style="width: 100px;">Round 4</th>
+              <th style="width: 100px;">Round 5</th>
+              <th style="width: 120px; background: #eff6ff; color: #1e3a8a;">Total (25k)</th>
+              <th style="width: 100px; background: #00247d; color: white;">Map Points</th>
+            </tr>
+          </thead>
+          <tbody id="rawTableBody">
+            <!-- ข้อมูลคะแนนดิบรายรอบจะถูกสร้างผ่าน JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. ส่วนเนื้อหาหน้ารหัสกติกา (แสดงเมื่อคลิกแท็บ Rules) -->
     <div id="rulesView" style="display: none; background: white; border: 2px solid var(--gold-accent); padding: 30px; border-radius: 0 0 6px 6px;">
       <h2 style="color: var(--navy-primary); margin-bottom: 16px;">📜 กฎและกติกาการคำนวณคะแนน (Rules & Scoring)</h2>
       <div style="line-height: 1.8; color: #334155; font-size: 0.95rem;">
@@ -97,7 +149,7 @@
     </div>
   </div>
 
-  <!-- 4. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) -->
+  <!-- 7. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) -->
   <div class="excel-tabs-bar">
     <div class="excel-tab-icon">☰</div>
     <div id="excelTabsList" class="excel-tabs-list">
@@ -106,39 +158,6 @@
         📜 กฎกติกา (Rules)
       </div>
       <!-- แท็บสัปดาห์ต่าง ๆ จะถูกสร้างผ่าน JS ที่นี่ -->
-    </div>
-  </div>
-
-  <!-- 5. Modal แสดงรายละเอียดคะแนนดิบ 6 Rounds ย่อย -->
-  <div id="detailModal" class="modal-backdrop">
-    <div class="modal-box">
-      <div class="modal-header">
-        <div>
-          <h3 id="modalPlayer" class="modal-title">รายละเอียดคะแนน</h3>
-          <span id="modalMapName" style="font-size: 0.85rem; color: #64748b;">Map 1</span>
-        </div>
-        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
-      </div>
-
-      <div style="margin-bottom: 12px; font-size: 0.85rem; color: #475569;">
-        สูตรคำนวณ: <code>Phantom = Raw + 10%*(Max-Raw)</code> แล้วนำไปเทียบกับคะแนนดิบของทุกคน
-      </div>
-
-      <div style="display: grid; grid-template-columns: 80px 100px 110px 1fr; font-weight: 700; font-size: 0.8rem; color: #64748b; padding: 4px 12px; margin-bottom: 4px;">
-        <span>รอบ</span>
-        <span style="text-align: right;">คะแนนดิบ</span>
-        <span style="text-align: right;">Phantom (10%)</span>
-        <span style="text-align: right;">แต้มที่ได้</span>
-      </div>
-
-      <div id="modalRoundsList">
-        <!-- แถว R1 - R5 + Total จะถูกสร้างผ่าน JS -->
-      </div>
-
-      <div style="margin-top: 16px; padding: 12px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: 700; color: #1e3a8a;">คะแนนที่ได้จาก Map นี้ (Points):</span>
-        <strong id="modalMapPoints" style="font-size: 1.25rem; color: #00247d;">-</strong>
-      </div>
     </div>
   </div>
 

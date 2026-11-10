@@ -4,7 +4,6 @@
    ธีม: Thai Flag Navy (#00247D), Red (#EF3340), Gold (#F59E0B)
    ==================================================================== */
 
-/* ตั้งค่าฟอนต์ FC Iconic (รองรับทั้งที่มีในเครื่อง และเผื่อนำไฟล์มาใส่ในโฟลเดอร์ fonts/) */
 @font-face {
   font-family: 'FC Iconic';
   src: local('FC Iconic'), local('FCIconic'), local('FC-Iconic'),
@@ -40,7 +39,6 @@
   --row-alt: #f1f5f9;
   --row-hover: #e0f2fe;
 
-  /* สีการ์ด Map 1 - 7 */
   --map1-color: #3b82f6;
   --map2-color: #22c55e;
   --map3-color: #ef4444;
@@ -69,7 +67,7 @@ body {
   margin: 0 auto;
 }
 
-/* 1. Header Banner ด้านบนสุด */
+/* 1. Header Banner */
 .top-banner {
   background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%);
   color: #1e293b;
@@ -96,7 +94,7 @@ body {
   color: #334155;
 }
 
-/* 2. Layout ด้านบน: โลโก้ซ้าย + การ์ด Map ขวา */
+/* 2. Top Section */
 .top-section {
   display: grid;
   grid-template-columns: 240px 1fr;
@@ -144,7 +142,7 @@ body {
   letter-spacing: 1px;
 }
 
-/* การ์ด 7 Maps */
+/* 7 Maps Grid */
 .maps-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -214,7 +212,61 @@ body {
   color: var(--navy-dark);
 }
 
-/* 3. ตารางคะแนนสไตล์ Excel / Sheets */
+/* 3. แถบสลับมุมมอง (Sub-tabs สลับตารางคะแนนรวม กับ คะแนนดิบ) */
+.view-switch-bar {
+  background: #0f1d36;
+  border-left: 2px solid var(--gold-accent);
+  border-right: 2px solid var(--gold-accent);
+  padding: 10px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid #1e3a8a;
+}
+
+.view-tab-btn {
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.view-tab-btn:hover {
+  background: #334155;
+  color: white;
+}
+
+.view-tab-btn.active {
+  background: var(--navy-primary);
+  color: white;
+  border-color: var(--gold-accent);
+  box-shadow: 0 0 0 1px var(--gold-accent);
+}
+
+.lock-pill {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  background: #475569;
+  color: #e2e8f0;
+}
+
+.lock-pill.unlocked {
+  background: #15803d;
+  color: #dcfce7;
+}
+
+/* 4. ตารางคะแนนสไตล์ Excel / Sheets */
 .table-wrapper {
   background: white;
   border: 2px solid var(--gold-accent);
@@ -302,15 +354,71 @@ body {
   font-size: 0.82rem;
 }
 
-.clickable-cell {
-  cursor: pointer;
-}
-.clickable-cell:hover {
-  background-color: #bfdbfe !important;
-  color: var(--navy-primary);
+/* 5. หน้าแสดงคะแนนดิบ (Raw Scores View) */
+.raw-controls-bar {
+  background: #f8fafc;
+  border-bottom: 2px solid var(--table-border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* 4. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) */
+.raw-map-pill {
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #334155;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.raw-map-pill:hover {
+  background: #e2e8f0;
+}
+
+.raw-map-pill.active {
+  background: var(--navy-primary);
+  color: white;
+  border-color: var(--navy-primary);
+}
+
+.raw-cell {
+  padding: 6px 4px !important;
+  vertical-align: middle;
+}
+
+.raw-score-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.raw-pts-badge {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.locked-card {
+  background: white;
+  border: 2px solid var(--gold-accent);
+  padding: 60px 20px;
+  text-align: center;
+  border-radius: 0 0 6px 6px;
+}
+
+/* 6. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) */
 .excel-tabs-bar {
   position: fixed;
   bottom: 0;
@@ -382,75 +490,4 @@ body {
 .excel-tab.rules-tab.active {
   background: white;
   color: var(--thai-red);
-}
-
-/* 5. Modal สำหรับคะแนนดิบ */
-.modal-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  z-index: 2000;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  backdrop-filter: blur(2px);
-}
-
-.modal-backdrop.open {
-  display: flex;
-}
-
-.modal-box {
-  background: white;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 580px;
-  padding: 24px;
-  box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-  border: 2px solid var(--navy-primary);
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-}
-
-.modal-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--navy-primary);
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.6rem;
-  cursor: pointer;
-  color: var(--text-muted);
-}
-
-.round-row {
-  display: grid;
-  grid-template-columns: 80px 100px 110px 1fr;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  margin-bottom: 6px;
-  font-size: 0.88rem;
-}
-
-.round-row.total-row {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  font-weight: 700;
-  color: var(--navy-primary);
 }
