@@ -5,6 +5,14 @@
 // ====================================================================
 
 require("dotenv").config();
+
+// Polyfill WebSocket สำหรับ Node.js ทุกเวอร์ชันเพื่อป้องกัน Supabase Crash
+if (typeof globalThis.WebSocket === "undefined") {
+  try {
+    globalThis.WebSocket = require("ws");
+  } catch (e) {}
+}
+
 const { createClient } = require("@supabase/supabase-js");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -23,7 +31,9 @@ if (!GEOGUESSR_COOKIE) {
 }
 
 // สร้าง Supabase Client ด้วย Service Role Key เพื่อให้มีสิทธิ์เขียนข้อมูล
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
