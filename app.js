@@ -19,6 +19,8 @@ if (CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT_ID")) {
 // DOM Elements
 const bannerTitle = document.getElementById("bannerTitle");
 const bannerSubInfo = document.getElementById("bannerSubInfo");
+const countdownBadge = document.getElementById("countdownBadge");
+const topSection = document.getElementById("topSection");
 const lastUpdateText = document.getElementById("lastUpdateText");
 const mapsGrid = document.getElementById("mapsGrid");
 const tableTopHeaderRow = document.getElementById("tableTopHeaderRow");
@@ -116,6 +118,8 @@ async function selectWeek(weekId) {
   const targetTab = document.getElementById(`tab-week-${weekId}`);
   if (targetTab) targetTab.classList.add("active");
 
+  // Show Top Section (Logo + 7 Map Cards) when viewing a week
+  if (topSection) topSection.style.display = "grid";
   rulesView.style.display = "none";
 
   scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">Loading data and calculating scores...</td></tr>`;
@@ -130,6 +134,9 @@ async function selectWeek(weekId) {
 
   const updateDate = week.updated_at ? new Date(week.updated_at) : new Date();
   lastUpdateText.textContent = `${updateDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${updateDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+
+  // Start live countdown timer for this week
+  startCountdown(week.end_date, week.is_frozen);
 
   // Show or hide View Switcher based on week status
   // When active: completely hide the switcher and show only leaderboard
@@ -180,6 +187,7 @@ window.switchMainView = function (viewName) {
 
   currentMainView = viewName;
   rulesView.style.display = "none";
+  if (topSection) topSection.style.display = "grid";
 
   if (viewName === "leaderboard") {
     viewBtnLeaderboard.classList.add("active");
@@ -202,13 +210,90 @@ window.switchTab = function (tabName) {
   if (tabName === "rules") {
     document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
     document.getElementById("tabRules").classList.add("active");
+
+    // Hide leaderboard and raw views
     leaderboardView.style.display = "none";
     rawScoresView.style.display = "none";
     viewSwitchBar.style.display = "none";
+
+    // Hide Top Section (7 Map Cards) so they don't leak into rules
+    if (topSection) topSection.style.display = "none";
+
+    // Update Banner for Rules
+    bannerTitle.textContent = "📜 Rules & Scoring / กฎและกติกาการแข่งขัน";
+    bannerSubInfo.textContent = "Season 1 (Nov 14, 2026 – Jan 1, 2027)";
+
+    // Stop and hide countdown on rules page
+    if (countdownBadge) countdownBadge.style.display = "none";
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     rulesView.style.display = "block";
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 };
+
+/**
+ * Live Countdown Timer for playing deadline
+ */
+let countdownInterval = null;
+
+function startCountdown(endDateStr, isFrozen) {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
+  if (!countdownBadge) return;
+
+  if (isFrozen) {
+    countdownBadge.className = "countdown-badge frozen";
+    countdownBadge.innerHTML = `❄️ Ended`;
+    countdownBadge.style.display = "inline-flex";
+    return;
+  }
+
+  if (!endDateStr) {
+    countdownBadge.style.display = "none";
+    return;
+  }
+
+  function updateTimer() {
+    const endMs = new Date(endDateStr).getTime();
+    const nowMs = Date.now();
+    const diff = endMs - nowMs;
+
+    if (diff <= 0) {
+      countdownBadge.className = "countdown-badge frozen";
+      countdownBadge.innerHTML = `⌛ Time's Up`;
+      countdownBadge.style.display = "inline-flex";
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      return;
+    }
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    countdownBadge.className = "countdown-badge";
+    if (days > 0) {
+      countdownBadge.innerHTML = `⏳ <strong>${days}d ${hours}h ${minutes}m</strong> left`;
+    } else {
+      countdownBadge.innerHTML = `⏳ <strong>${hours}h ${minutes}m ${seconds}s</strong> left`;
+    }
+    countdownBadge.style.display = "inline-flex";
+  }
+
+  updateTimer();
+  countdownInterval = setInterval(updateTimer, 1000);
+}
 
 /**
  * 5.1 Toggle Rules Language between Thai ('th') and English ('en')
