@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - GeoGuessr Weekly Challenge</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      background-color: #07162c;
+      color: #1e293b;
+      padding: 20px;
+    }
+    .admin-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .admin-card {
+      background: white;
+      border: 2px solid var(--gold-accent);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      color: var(--navy-primary);
+    }
+    input[type="text"], input[type="datetime-local"], input[type="password"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+    input:focus {
+      border-color: var(--navy-primary);
+      outline: none;
+    }
+    .btn {
+      background: var(--navy-primary);
+      color: white;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 4px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: inherit;
+      transition: opacity 0.15s ease;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+    .btn-freeze {
+      background: #0284c7;
+    }
+    .btn-danger {
+      background: #dc2626;
+    }
+    .map-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      background: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 10px;
+    }
+    .week-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* กล่องเข้าสู่ระบบ (Login Gate) */
+    .login-box {
+      max-width: 440px;
+      margin: 80px auto;
+      background: white;
+      border-radius: 8px;
+      border: 2px solid var(--gold-accent);
+      padding: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+
+    <!-- 1. หน้าต่างล็อกอิน (แสดงเฉพาะคนที่ยังไม่ใส่รหัส Admin) -->
+    <div id="loginGate" class="login-box" style="display: none;">
+      <div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>
+      <h2 style="color: var(--navy-primary); margin-bottom: 6px;">ระบบควบคุมแอดมิน</h2>
+      <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">
+        กรุณากรอก <code>Service Role Secret Key</code> เพื่อเข้าสู่ระบบ
+      </p>
+
+      <form id="loginForm">
+        <input type="password" id="loginKeyInput" placeholder="วาง Service Role Key ที่นี่..." required style="margin-bottom: 14px;">
+        <button type="submit" class="btn" style="width: 100%; padding: 10px; background: var(--thai-red);">
+          เข้าสู่ระบบ (Login)
+        </button>
+      </form>
+      <div id="loginError" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px; display: none;"></div>
+      
+      <div style="margin-top: 20px;">
+        <a href="index.html" style="font-size: 0.85rem; color: #64748b; text-decoration: none;">← กลับสู่หน้าหลัก</a>
+      </div>
+    </div>
+
+    <!-- 2. แผงควบคุมแอดมิน (แสดงเมื่อล็อกอินผ่านแล้วเท่านั้น) -->
+    <div id="adminDashboard" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <h1 style="color: white; font-size: 1.6rem; font-weight: 800;">⚙️ แผงควบคุมระบบ (Admin Panel)</h1>
+          <p style="color: #94a3b8; font-size: 0.9rem;">สร้างสัปดาห์แข่งขันใหม่ และจัดการลิงก์ทั้ง 7 Maps</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <a href="index.html" class="btn" style="background: var(--gold-accent); color: #0f172a; text-decoration: none;">← ไปหน้าตารางคะแนน</a>
+          <button id="logoutBtn" class="btn" style="background: #475569;">🚪 ออกจากระบบ</button>
+        </div>
+      </div>
+
+      <!-- ฟอร์มสร้างสัปดาห์ใหม่พร้อม 7 Maps -->
+      <div class="admin-card">
+        <h2 style="color: var(--navy-primary); font-size: 1.2rem; margin-bottom: 16px;">➕ สร้างสัปดาห์แข่งขันใหม่ (New Week)</h2>
+        <form id="createWeekForm">
+          <div class="form-group">
+            <label>ชื่อสัปดาห์ (Week Title):</label>
+            <input type="text" id="weekTitle" placeholder="เช่น Cactus Ligue #11-06 หรือ Week 1" required>
+          </div>
+
+          <div class="form-group">
+            <label>ข้อความแถบข้อมูลด้านบน (Header Info Text):</label>
+            <input type="text" id="weekHeaderInfo" placeholder="เช่น Du ven. 23 au ven. 30 octobre || You must play before October 30th">
+          </div>
+
+          <div class="form-group">
+            <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
+            <input type="datetime-local" id="weekEndDate">
+            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง)</small>
+          </div>
+
+          <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ กรอกข้อมูลทั้ง 7 Maps:</h3>
+
+          <div id="mapsInputsContainer">
+            <div class="map-row">
+              <strong>Map 1:</strong>
+              <input type="text" class="map-name-input" data-seed="1" placeholder="ชื่อแมพ & โหมด (เช่น Kosovo | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="1" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 2:</strong>
+              <input type="text" class="map-name-input" data-seed="2" placeholder="ชื่อแมพ & โหมด (เช่น Kosovo | No move 2')" required>
+              <input type="text" class="map-url-input" data-seed="2" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 3:</strong>
+              <input type="text" class="map-name-input" data-seed="3" placeholder="ชื่อแมพ & โหมด (เช่น Hallstatt Culture | NM 2')" required>
+              <input type="text" class="map-url-input" data-seed="3" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 4:</strong>
+              <input type="text" class="map-name-input" data-seed="4" placeholder="ชื่อแมพ & โหมด (เช่น Fall | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="4" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 5:</strong>
+              <input type="text" class="map-name-input" data-seed="5" placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="5" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 6:</strong>
+              <input type="text" class="map-name-input" data-seed="6" placeholder="ชื่อแมพ & โหมด (เช่น World | NMPZ 1')" required>
+              <input type="text" class="map-url-input" data-seed="6" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+            <div class="map-row">
+              <strong>Map 7:</strong>
+              <input type="text" class="map-name-input" data-seed="7" placeholder="ชื่อแมพ & โหมด (เช่น AI Generation | NM 2')" required>
+              <input type="text" class="map-url-input" data-seed="7" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn" style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; background: var(--thai-red);">
+            🚀 บันทึกและเปิดสัปดาห์แข่งขันใหม่
+          </button>
+        </form>
+      </div>
+
+      <!-- รายการจัดการสัปดาห์ทั้งหมด -->
+      <div class="admin-card">
+        <h2 style="color: var(--navy-primary); font-size: 1.2rem; margin-bottom: 16px;">📋 จัดการสัปดาห์ทั้งหมด</h2>
+        <div id="weeksList">
+          <p style="color: #64748b;">กำลังโหลด...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

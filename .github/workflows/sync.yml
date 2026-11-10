@@ -1,0 +1,31 @@
+name: GeoGuessr Weekly Challenge Auto Sync
+
+on:
+  schedule:
+    # รันอัตโนมัติทุก 30 นาที
+    - cron: "*/30 * * * *"
+  workflow_dispatch: # อนุญาตให้กดสั่งรันด้วยมือผ่านหน้าเว็บ GitHub ได้ตลอดเวลา
+
+jobs:
+  sync-scores:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Sync Worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEOGUESSR_COOKIE: ${{ secrets.GEOGUESSR_COOKIE }}
+          BOT_USER_ID: ${{ secrets.BOT_USER_ID }}
+        run: node sync.js
+

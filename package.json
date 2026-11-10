@@ -1,0 +1,14 @@
+{
+  "name": "geoguessr-weekly-tracker",
+  "version": "1.0.0",
+  "description": "GeoGuessr Weekly Challenge Tracker & Sync Worker",
+  "main": "sync.js",
+  "scripts": {
+    "sync": "node sync.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7"
+  }
+}
+

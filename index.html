@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoGuessr Weekly Challenge League</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- 1. Header Banner ด้านบนสุด -->
+    <div class="top-banner">
+      <div class="banner-left">
+        <span id="bannerTitle">🏆 GeoGuessr Weekly League</span>
+        <span>||</span>
+        <span id="bannerSubInfo">กำลังโหลดข้อมูล...</span>
+      </div>
+      <div class="banner-right">
+        <span>Last Update : <strong id="lastUpdateText">-</strong></span>
+      </div>
+    </div>
+
+    <!-- 2. ส่วนบน: โลโก้ซ้าย + การ์ด 7 Maps ขวา -->
+    <div class="top-section">
+      <!-- กล่องใส่โลโก้ -->
+      <div class="logo-container">
+        <!-- ถ้ามีไฟล์ logo.png จะแสดงรูป ถ้ายังไม่มีจะแสดงกล่องข้อความจำลอง -->
+        <img id="leagueLogo" src="logo.png" class="logo-img" alt="League Logo" 
+             onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+        <div id="logoPlaceholder" class="logo-placeholder" style="display: none;">
+          <span class="league-badge">GEOGUESSR</span>
+          <span style="font-size: 0.75rem; color: #94a3b8;">(ใส่ไฟล์ logo.png ที่โฟลเดอร์เว็บ)</span>
+        </div>
+      </div>
+
+      <!-- การ์ด 7 Maps -->
+      <div id="mapsGrid" class="maps-grid">
+        <div style="color: white; grid-column: span 7; text-align: center; padding: 20px;">
+          กำลังโหลดรายชื่อ 7 Maps...
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. ตารางคะแนนสไตล์ Excel / Google Sheets -->
+    <div class="table-wrapper">
+      <table class="sheets-table">
+        <thead>
+          <tr id="tableTopHeaderRow">
+            <th class="col-pos" rowspan="2">Position</th>
+            <th class="col-player" rowspan="2">Pseudo</th>
+            <th class="col-total" rowspan="2">Points</th>
+            <!-- คอลัมน์ Map 1 ถึง 7 (Colspan 2) จะถูกสร้างผ่าน JS -->
+          </tr>
+          <tr id="tableSubHeaderRow">
+            <!-- Points | Rank ของแต่ละ Map -->
+          </tr>
+        </thead>
+        <tbody id="scoresTableBody">
+          <tr>
+            <td colspan="17" style="padding: 40px; color: #64748b;">
+              กำลังคำนวณคะแนน Phantom Score (10% Threshold)...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ส่วนเนื้อหาหน้ารหัสกติกา (แสดงเมื่อคลิกแท็บ Rules) -->
+    <div id="rulesView" style="display: none; background: white; border: 2px solid var(--gold-accent); padding: 30px; border-radius: 0 0 6px 6px;">
+      <h2 style="color: var(--navy-primary); margin-bottom: 16px;">📜 กฎและกติกาการคำนวณคะแนน (Rules & Scoring)</h2>
+      <div style="line-height: 1.8; color: #334155; font-size: 0.95rem;">
+        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">1. รูปแบบการแข่งขัน</h3>
+        <p>• ในแต่ละสัปดาห์จะมีทั้งหมด <strong>7 Maps (7 Challenges)</strong> ให้ผู้เล่นเข้าไปเล่น</p>
+        <p>• แต่ละ Map มี 5 Rounds ปกติ (คะแนนเต็มรอบละ 5,000) และคะแนนรวม (เต็ม 25,000) จะนับเป็น <strong>Round ที่ 6</strong> รวมเป็น 6 Rounds ย่อยในการคำนวณ</p>
+
+        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">2. การคำนวณ Phantom Score (10% Missing-Score Threshold)</h3>
+        <p>ในแต่ละ Round จะคำนวณคะแนนแฟนทอมของผู้เล่นตามสูตร:</p>
+        <div style="background: #f1f5f9; padding: 12px 18px; border-left: 4px solid var(--navy-primary); margin: 8px 0; font-family: monospace; font-size: 1rem;">
+          Phantom Score = คะแนนดิบ + 10% × (คะแนนเต็ม - คะแนนดิบ)
+        </div>
+        <p>• นำ Phantom Score ของเราไปเทียบกับคะแนนดิบของผู้เล่นทุกคนในตาราง</p>
+        <p>• <strong>คะแนนที่ได้รับในแต่ละ Round</strong> = จำนวนผู้เล่นที่เราชนะหรือเสมอด้วย Phantom Score นั้น</p>
+
+        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">3. คะแนนประจำ Map (Points per Map)</h3>
+        <p>• รวมคะแนนจากทั้ง 6 Rounds ย่อยเข้าด้วยกันเป็นคะแนนสะสมของแมพ</p>
+        <p>• นำคะแนนสะสมไปจัดอันดับเทียบกับผู้เล่นทุกคนอีกครั้ง เพื่อแปลงเป็น <strong>Points ประจำ Map</strong></p>
+        <p>• ผู้ที่ได้อันดับ 1 ของแมพจะได้คะแนนเต็มเท่ากับจำนวนผู้เล่นทั้งหมด (เช่น 555 แต้ม) และได้รับเหรียญ 🥇</p>
+
+        <h3 style="color: #0f172a; margin: 16px 0 8px 0;">4. คะแนนรวมประจำสัปดาห์ (Total Points)</h3>
+        <p>• รวมคะแนน Points ที่ได้รับจากทั้ง 7 Maps เข้าด้วยกันเป็นคะแนนรวมสุดท้ายเพื่อจัดอันดับประจำสัปดาห์</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. แถบแท็บด้านล่าง (Bottom Tab Bar สไตล์ Google Sheets / Excel) -->
+  <div class="excel-tabs-bar">
+    <div class="excel-tab-icon">☰</div>
+    <div id="excelTabsList" class="excel-tabs-list">
+      <!-- แท็บกติกา -->
+      <div id="tabRules" class="excel-tab rules-tab" onclick="switchTab('rules')">
+        📜 กฎกติกา (Rules)
+      </div>
+      <!-- แท็บสัปดาห์ต่าง ๆ จะถูกสร้างผ่าน JS ที่นี่ -->
+    </div>
+  </div>
+
+  <!-- 5. Modal แสดงรายละเอียดคะแนนดิบ 6 Rounds ย่อย -->
+  <div id="detailModal" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalPlayer" class="modal-title">รายละเอียดคะแนน</h3>
+          <span id="modalMapName" style="font-size: 0.85rem; color: #64748b;">Map 1</span>
+        </div>
+        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+      </div>
+
+      <div style="margin-bottom: 12px; font-size: 0.85rem; color: #475569;">
+        สูตรคำนวณ: <code>Phantom = Raw + 10%*(Max-Raw)</code> แล้วนำไปเทียบกับคะแนนดิบของทุกคน
+      </div>
+
+      <div style="display: grid; grid-template-columns: 80px 100px 110px 1fr; font-weight: 700; font-size: 0.8rem; color: #64748b; padding: 4px 12px; margin-bottom: 4px;">
+        <span>รอบ</span>
+        <span style="text-align: right;">คะแนนดิบ</span>
+        <span style="text-align: right;">Phantom (10%)</span>
+        <span style="text-align: right;">แต้มที่ได้</span>
+      </div>
+
+      <div id="modalRoundsList">
+        <!-- แถว R1 - R5 + Total จะถูกสร้างผ่าน JS -->
+      </div>
+
+      <div style="margin-top: 16px; padding: 12px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; color: #1e3a8a;">คะแนนที่ได้จาก Map นี้ (Points):</span>
+        <strong id="modalMapPoints" style="font-size: 1.25rem; color: #00247d;">-</strong>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
