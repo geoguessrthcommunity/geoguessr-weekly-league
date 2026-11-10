@@ -22,8 +22,8 @@ async function checkAuth() {
     return;
   }
 
-  const isValid = await verifyKey(savedKey);
-  if (isValid) {
+  const result = await verifyKey(savedKey);
+  if (result.ok) {
     showDashboard();
   } else {
     localStorage.removeItem("llgg_admin_service_key");
@@ -33,22 +33,20 @@ async function checkAuth() {
 
 async function verifyKey(key) {
   if (!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes("YOUR_PROJECT_ID")) {
-    showLoginError("❌ กรุณาตั้งค่า CONFIG.SUPABASE_URL ใน config.js ก่อนใช้งาน");
-    return false;
+    return { ok: false, error: "กรุณาอัปเดต CONFIG.SUPABASE_URL ใน config.js แล้ว git push ขึ้นเว็บก่อนครับ" };
   }
 
   try {
     const testDb = supabase.createClient(CONFIG.SUPABASE_URL, key);
-    // ทดสอบยิง Query สิทธิ์ Service Role
     const { error } = await testDb.from("weeks").select("id").limit(1);
     if (error) {
       console.warn("Auth check error:", error.message);
-      return false;
+      return { ok: false, error: `Supabase ปฏิเสธ: ${error.message}` };
     }
     adminDb = testDb;
-    return true;
+    return { ok: true };
   } catch (err) {
-    return false;
+    return { ok: false, error: err.message };
   }
 }
 
@@ -76,13 +74,13 @@ loginForm.addEventListener("submit", async (e) => {
   const key = loginKeyInput.value.trim();
   if (!key) return;
 
-  const isValid = await verifyKey(key);
-  if (isValid) {
+  const result = await verifyKey(key);
+  if (result.ok) {
     localStorage.setItem("llgg_admin_service_key", key);
     loginKeyInput.value = "";
     showDashboard();
   } else {
-    showLoginError("❌ Key ไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึงฐานข้อมูล Supabase");
+    showLoginError(`❌ ${result.error || "Key ไม่ถูกต้อง หรือไม่มีสิทธิ์เข้าถึง Supabase"}`);
   }
 });
 
