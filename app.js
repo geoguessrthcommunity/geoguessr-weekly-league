@@ -8,9 +8,13 @@ let allWeeks = [];
 let currentWeek = null;
 let currentChallenges = [];
 let currentCalculatedData = null;
+let seasonStandingsCache = null;
 
 let currentMainView = "leaderboard"; // "leaderboard" | "raw"
 let selectedRawSeed = 1; // 1 to 7
+
+let realtimeChannel = null;
+let realtimeDebounceTimer = null;
 
 if (CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT_ID")) {
   db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -28,6 +32,7 @@ const tableSubHeaderRow = document.getElementById("tableSubHeaderRow");
 const scoresTableBody = document.getElementById("scoresTableBody");
 const excelTabsList = document.getElementById("excelTabsList");
 const rulesView = document.getElementById("rulesView");
+const seasonView = document.getElementById("seasonView");
 
 // View Switcher Elements
 const viewSwitchBar = document.getElementById("viewSwitchBar");
@@ -78,6 +83,9 @@ async function init() {
     const defaultWeek = weeks.find((w) => w.is_active) || weeks[0];
     await selectWeek(defaultWeek.id);
 
+    // Setup Supabase Realtime Listener (debounced)
+    setupRealtime();
+
     // Restore saved rules language preference if any
     try {
       const savedLang = localStorage.getItem("rules_lang");
@@ -105,8 +113,10 @@ function renderBottomTabs() {
     .join("");
 
   const rulesTab = document.getElementById("tabRules");
+  const seasonTab = document.getElementById("tabSeason");
   excelTabsList.innerHTML = "";
-  excelTabsList.appendChild(rulesTab);
+  if (rulesTab) excelTabsList.appendChild(rulesTab);
+  if (seasonTab) excelTabsList.appendChild(seasonTab);
   excelTabsList.insertAdjacentHTML("beforeend", tabsHtml);
 }
 
@@ -120,7 +130,8 @@ async function selectWeek(weekId) {
 
   // Show Top Section (Logo + 7 Map Cards) when viewing a week
   if (topSection) topSection.style.display = "grid";
-  rulesView.style.display = "none";
+  if (rulesView) rulesView.style.display = "none";
+  if (seasonView) seasonView.style.display = "none";
 
   scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">Loading data and calculating scores...</td></tr>`;
 
@@ -139,8 +150,6 @@ async function selectWeek(weekId) {
   startCountdown(week.end_date, week.is_frozen);
 
   // Show or hide View Switcher based on week status
-  // When active: completely hide the switcher and show only leaderboard
-  // When frozen: show the switcher so users can toggle between Leaderboard and Raw Scores
   if (week.is_frozen) {
     viewSwitchBar.style.display = "flex";
   } else {
@@ -180,13 +189,13 @@ async function selectWeek(weekId) {
  * 4. Switch between Leaderboard and Raw Scores View
  */
 window.switchMainView = function (viewName) {
-  // If week is not frozen, force leaderboard only
   if (!currentWeek?.is_frozen) {
     viewName = "leaderboard";
   }
 
   currentMainView = viewName;
-  rulesView.style.display = "none";
+  if (rulesView) rulesView.style.display = "none";
+  if (seasonView) seasonView.style.display = "none";
   if (topSection) topSection.style.display = "grid";
 
   if (viewName === "leaderboard") {
@@ -204,26 +213,23 @@ window.switchMainView = function (viewName) {
 };
 
 /**
- * 5. Switch to Rules View
+ * 5. Switch to Rules View or Season Standings View
  */
 window.switchTab = function (tabName) {
-  if (tabName === "rules") {
-    document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
-    document.getElementById("tabRules").classList.add("active");
+  document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
 
-    // Hide leaderboard and raw views
+  if (tabName === "rules") {
+    document.getElementById("tabRules")?.classList.add("active");
+
     leaderboardView.style.display = "none";
     rawScoresView.style.display = "none";
     viewSwitchBar.style.display = "none";
-
-    // Hide Top Section (7 Map Cards) so they don't leak into rules
+    if (seasonView) seasonView.style.display = "none";
     if (topSection) topSection.style.display = "none";
 
-    // Update Banner for Rules
     bannerTitle.textContent = "📜 Rules & Scoring / กฎและกติกาการแข่งขัน";
     bannerSubInfo.textContent = "Season 1 (Nov 14, 2026 – Jan 1, 2027)";
 
-    // Stop and hide countdown on rules page
     if (countdownBadge) countdownBadge.style.display = "none";
     if (countdownInterval) {
       clearInterval(countdownInterval);
@@ -232,6 +238,27 @@ window.switchTab = function (tabName) {
 
     rulesView.style.display = "block";
     window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (tabName === "season") {
+    document.getElementById("tabSeason")?.classList.add("active");
+
+    leaderboardView.style.display = "none";
+    rawScoresView.style.display = "none";
+    viewSwitchBar.style.display = "none";
+    rulesView.style.display = "none";
+    if (topSection) topSection.style.display = "none";
+
+    bannerTitle.textContent = "🏆 Season 1 Standings";
+    bannerSubInfo.textContent = "Cumulative points from frozen weeks (Section 6 Rules)";
+
+    if (countdownBadge) countdownBadge.style.display = "none";
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
+    if (seasonView) seasonView.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    loadAndRenderSeasonStandings();
   }
 };
 
@@ -380,9 +407,9 @@ function renderTableHeaders(challenges) {
 }
 
 /**
- * 8. Phantom Score (10% Threshold) Algorithm
+ * 8. Reusable Week Calculation (Phantom Score 10% Threshold Algorithm)
  */
-function calculateAndRenderScores(scores, challenges) {
+function computeWeekStandings(challenges, scores) {
   const playersByMap = new Map();
   const allPlayerIds = new Set();
   const playerNames = new Map();
@@ -461,10 +488,8 @@ function calculateAndRenderScores(scores, challenges) {
     mapResults.set(c.id, resultMap);
   });
 
-  currentCalculatedData = { mapResults, challenges, playerNames };
-
-  // 4. Grand Total across all 7 Maps
-  const finalLeaderboard = [];
+  // Grand Total across all challenges in this week
+  const leaderboard = [];
 
   allPlayerIds.forEach((uId) => {
     let grandTotal = 0;
@@ -480,7 +505,7 @@ function calculateAndRenderScores(scores, challenges) {
       }
     });
 
-    finalLeaderboard.push({
+    leaderboard.push({
       userId: uId,
       username: playerNames.get(uId) || "Unknown",
       grandTotal,
@@ -488,26 +513,42 @@ function calculateAndRenderScores(scores, challenges) {
     });
   });
 
-  if (finalLeaderboard.length === 0) {
+  // Sort overall standings (descending)
+  leaderboard.sort((a, b) => b.grandTotal - a.grandTotal);
+
+  for (let i = 0; i < leaderboard.length; i++) {
+    if (i > 0 && leaderboard[i].grandTotal === leaderboard[i - 1].grandTotal) {
+      leaderboard[i].overallRank = leaderboard[i - 1].overallRank;
+    } else {
+      leaderboard[i].overallRank = i + 1;
+    }
+  }
+
+  return { leaderboard, mapResults, playerNames };
+}
+
+/**
+ * 8.1 Calculate and render Main Leaderboard Table for Current Week
+ */
+function calculateAndRenderScores(scores, challenges) {
+  const { leaderboard, mapResults, playerNames } = computeWeekStandings(challenges, scores);
+
+  currentCalculatedData = { mapResults, challenges, playerNames, leaderboard };
+
+  if (leaderboard.length === 0) {
     scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">No players have completed 5 rounds in this week yet.</td></tr>`;
     return;
   }
 
-  // Sort overall standings
-  finalLeaderboard.sort((a, b) => b.grandTotal - a.grandTotal);
-
-  for (let i = 0; i < finalLeaderboard.length; i++) {
-    if (i > 0 && finalLeaderboard[i].grandTotal === finalLeaderboard[i - 1].grandTotal) {
-      finalLeaderboard[i].overallRank = finalLeaderboard[i - 1].overallRank;
-    } else {
-      finalLeaderboard[i].overallRank = i + 1;
-    }
-  }
-
-  // Render Main Leaderboard Table
-  scoresTableBody.innerHTML = finalLeaderboard
+  scoresTableBody.innerHTML = leaderboard
     .map((p) => {
       const posDisplay = formatRankDisplay(p.overallRank);
+
+      // Count played maps out of total challenges
+      const playedMapsCount = challenges.filter((c) => p.maps[c.id]).length;
+      const totalMapsCount = challenges.length || 7;
+      const badgeCls = playedMapsCount === totalMapsCount ? "played-badge complete" : "played-badge";
+      const playedBadge = `<span class="${badgeCls}" title="Completed ${playedMapsCount} of ${totalMapsCount} maps">[${playedMapsCount}/${totalMapsCount}]</span>`;
 
       const mapCols = challenges
         .map((c) => {
@@ -531,7 +572,9 @@ function calculateAndRenderScores(scores, challenges) {
       return `
         <tr>
           <td class="col-pos">${posDisplay}</td>
-          <td class="col-player" title="${escapeHtml(p.username)}">${escapeHtml(p.username)}</td>
+          <td class="col-player" title="${escapeHtml(p.username)}">
+            <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view player profile">${escapeHtml(p.username)}</a>${playedBadge}
+          </td>
           <td class="col-total">${formatNum(p.grandTotal)}</td>
           ${mapCols}
         </tr>
@@ -602,7 +645,9 @@ function renderRawScoresView() {
       return `
         <tr>
           <td class="col-pos">${rankDisplay}</td>
-          <td class="col-player">${escapeHtml(p.username)}</td>
+          <td class="col-player">
+            <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view player profile">${escapeHtml(p.username)}</a>
+          </td>
           ${roundCells}
           ${totalCell}
           <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatNum(p.ptsMap)}</td>
@@ -616,6 +661,367 @@ window.selectRawMapSeed = function (seedNum) {
   selectedRawSeed = seedNum;
   renderRawScoresView();
 };
+
+/**
+ * 10. Season Points Formula (Section 6 Rules)
+ * Rank 1: N + 5
+ * Rank 2: N + 2
+ * Rank 3: N - 1
+ * Rank 4: N - 3
+ * Rank 5: N - 4
+ * Rank k (k >= 5): max(1, N - k + 1)
+ */
+function getSeasonPointsForRank(rank, N) {
+  if (!N || N <= 0) return 0;
+  if (rank === 1) return N + 5;
+  if (rank === 2) return N + 2;
+  if (rank === 3) return Math.max(1, N - 1);
+  if (rank === 4) return Math.max(1, N - 3);
+  if (rank === 5) return Math.max(1, N - 4);
+  return Math.max(1, N - rank + 1);
+}
+
+/**
+ * 11. Load and Render Season Standings
+ */
+async function loadAndRenderSeasonStandings() {
+  if (!db) return;
+  const seasonTableBody = document.getElementById("seasonTableBody");
+  const seasonTableHeaderRow = document.getElementById("seasonTableHeaderRow");
+  const seasonFrozenCountText = document.getElementById("seasonFrozenCountText");
+
+  seasonTableBody.innerHTML = `<tr><td colspan="15" style="padding: 40px; text-align: center; color: #64748b;">Calculating Season Standings...</td></tr>`;
+
+  try {
+    const frozenWeeks = allWeeks.filter((w) => w.is_frozen).sort((a, b) => a.id - b.id);
+
+    if (seasonFrozenCountText) {
+      seasonFrozenCountText.textContent = `Frozen Weeks: ${frozenWeeks.length}`;
+    }
+
+    if (frozenWeeks.length === 0) {
+      seasonTableHeaderRow.innerHTML = `
+        <th class="col-pos">Position</th>
+        <th class="col-player">Pseudo</th>
+        <th class="col-total">Season Points</th>
+      `;
+      seasonTableBody.innerHTML = `
+        <tr>
+          <td colspan="3" style="padding: 40px; text-align: center; color: #64748b;">
+            ❄️ No weeks have been frozen yet.<br>
+            Season points will be calculated as soon as a competition week concludes and is frozen.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    const frozenWeekIds = frozenWeeks.map((w) => w.id);
+    const { data: challenges, error: chErr } = await db
+      .from("challenges")
+      .select("*")
+      .in("week_id", frozenWeekIds)
+      .order("seed_number", { ascending: true });
+
+    if (chErr) throw chErr;
+
+    const chIds = (challenges || []).map((c) => c.id);
+    const { data: scores, error: scErr } = await db
+      .from("scores")
+      .select("*, players(id, username)")
+      .in("challenge_id", chIds);
+
+    if (scErr) throw scErr;
+
+    const weeklyStandingsMap = new Map();
+    const playerCumulative = new Map();
+
+    frozenWeeks.forEach((w) => {
+      const wChallenges = (challenges || []).filter((c) => c.week_id === w.id);
+      const wChIds = new Set(wChallenges.map((c) => c.id));
+      const wScores = (scores || []).filter((s) => wChIds.has(s.challenge_id));
+
+      const { leaderboard } = computeWeekStandings(wChallenges, wScores);
+      const N = leaderboard.length;
+
+      leaderboard.forEach((p) => {
+        const seasonPts = getSeasonPointsForRank(p.overallRank, N);
+
+        if (!playerCumulative.has(p.userId)) {
+          playerCumulative.set(p.userId, {
+            userId: p.userId,
+            username: p.username,
+            totalSeasonPts: 0,
+            weekStats: {},
+            podiums: { gold: 0, silver: 0, bronze: 0 },
+            weeksPlayed: 0,
+          });
+        }
+
+        const cp = playerCumulative.get(p.userId);
+        cp.totalSeasonPts += seasonPts;
+        cp.weeksPlayed += 1;
+        cp.weekStats[w.id] = {
+          pts: seasonPts,
+          rank: p.overallRank,
+          grandTotal: p.grandTotal,
+        };
+
+        if (p.overallRank === 1) cp.podiums.gold++;
+        else if (p.overallRank === 2) cp.podiums.silver++;
+        else if (p.overallRank === 3) cp.podiums.bronze++;
+      });
+
+      weeklyStandingsMap.set(w.id, { leaderboard, N });
+    });
+
+    const finalSeasonList = Array.from(playerCumulative.values()).sort(
+      (a, b) => b.totalSeasonPts - a.totalSeasonPts
+    );
+
+    for (let i = 0; i < finalSeasonList.length; i++) {
+      if (i > 0 && finalSeasonList[i].totalSeasonPts === finalSeasonList[i - 1].totalSeasonPts) {
+        finalSeasonList[i].seasonRank = finalSeasonList[i - 1].seasonRank;
+      } else {
+        finalSeasonList[i].seasonRank = i + 1;
+      }
+    }
+
+    seasonStandingsCache = { finalSeasonList, frozenWeeks, weeklyStandingsMap };
+
+    const weekHeadersHtml = frozenWeeks
+      .map((w) => `<th class="th-top-map" style="font-size: 0.85rem;">${escapeHtml(w.title)}</th>`)
+      .join("");
+
+    seasonTableHeaderRow.innerHTML = `
+      <th class="col-pos">Position</th>
+      <th class="col-player">Pseudo</th>
+      <th class="col-total">Season Points</th>
+      ${weekHeadersHtml}
+    `;
+
+    if (finalSeasonList.length === 0) {
+      seasonTableBody.innerHTML = `<tr><td colspan="${3 + frozenWeeks.length}" style="padding: 30px; text-align: center;">No player data available.</td></tr>`;
+      return;
+    }
+
+    seasonTableBody.innerHTML = finalSeasonList
+      .map((p) => {
+        const posDisplay = formatRankDisplay(p.seasonRank);
+
+        const weekCols = frozenWeeks
+          .map((w) => {
+            const st = p.weekStats[w.id];
+            if (!st) {
+              return `<td class="col-pts" style="color: #94a3b8;">-</td>`;
+            }
+            return `
+              <td class="col-pts" style="text-align: center;">
+                <div style="font-weight: 700; color: #00247d;">+${formatNum(st.pts)}</div>
+                <div style="font-size: 0.72rem; color: #64748b;">${formatRankDisplay(st.rank)}</div>
+              </td>
+            `;
+          })
+          .join("");
+
+        return `
+          <tr>
+            <td class="col-pos">${posDisplay}</td>
+            <td class="col-player">
+              <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view profile">${escapeHtml(p.username)}</a>
+            </td>
+            <td class="col-total" style="font-size: 1.05rem; color: #00247d;">${formatNum(p.totalSeasonPts)}</td>
+            ${weekCols}
+          </tr>
+        `;
+      })
+      .join("");
+  } catch (err) {
+    console.error("Season calculation error:", err);
+    seasonTableBody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #dc2626;">Error loading season standings: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+/**
+ * 12. Player Profile Modal
+ */
+window.openPlayerProfile = async function (userId) {
+  if (!db) return;
+
+  const modal = document.getElementById("playerProfileModal");
+  const modalPlayerUsername = document.getElementById("modalPlayerUsername");
+  const modalGeoguessrLink = document.getElementById("modalGeoguessrLink");
+  const modalPlayerIdSub = document.getElementById("modalPlayerIdSub");
+  const statSeasonPts = document.getElementById("statSeasonPts");
+  const statWeeksPlayed = document.getElementById("statWeeksPlayed");
+  const statPodiums = document.getElementById("statPodiums");
+  const stat5kRounds = document.getElementById("stat5kRounds");
+  const stat25kGames = document.getElementById("stat25kGames");
+  const modalHistoryTableBody = document.getElementById("modalHistoryTableBody");
+
+  modalPlayerUsername.textContent = "Loading Profile...";
+  modalPlayerIdSub.textContent = `User ID: ${userId}`;
+  modalGeoguessrLink.href = `https://www.geoguessr.com/user/${userId}`;
+  modalHistoryTableBody.innerHTML = `<tr><td colspan="11" style="padding: 24px; text-align: center; color: #64748b;">Loading player stats...</td></tr>`;
+
+  modal.classList.add("open");
+
+  try {
+    const { data: scores, error: scErr } = await db
+      .from("scores")
+      .select("*, challenges(*, weeks(*)), players(username)")
+      .eq("player_id", userId);
+
+    if (scErr) throw scErr;
+
+    const userScores = scores || [];
+    const username = userScores[0]?.players?.username || "Player";
+    modalPlayerUsername.textContent = username;
+
+    let count5k = 0;
+    let count25k = 0;
+    const uniqueWeeks = new Set();
+
+    userScores.forEach((s) => {
+      [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
+        if (r === 5000) count5k++;
+      });
+      if (s.total_score === 25000) count25k++;
+      if (s.challenges?.week_id) uniqueWeeks.add(s.challenges.week_id);
+    });
+
+    stat5kRounds.textContent = count5k.toLocaleString();
+    stat25kGames.textContent = count25k.toLocaleString();
+    statWeeksPlayed.textContent = uniqueWeeks.size.toLocaleString();
+
+    let seasonPts = "-";
+    let podiumsStr = "-";
+    if (seasonStandingsCache) {
+      const pData = seasonStandingsCache.finalSeasonList?.find((p) => p.userId === userId);
+      if (pData) {
+        seasonPts = formatNum(pData.totalSeasonPts);
+        podiumsStr = `${pData.podiums.gold}🥇 ${pData.podiums.silver}🥈 ${pData.podiums.bronze}🥉`;
+      }
+    }
+    statSeasonPts.textContent = seasonPts;
+    statPodiums.textContent = podiumsStr;
+
+    if (userScores.length === 0) {
+      modalHistoryTableBody.innerHTML = `<tr><td colspan="11" style="padding: 24px; text-align: center;">No recorded games found for this player.</td></tr>`;
+      return;
+    }
+
+    userScores.sort((a, b) => {
+      const wA = a.challenges?.week_id || 0;
+      const wB = b.challenges?.week_id || 0;
+      if (wB !== wA) return wB - wA;
+      return (a.challenges?.seed_number || 0) - (b.challenges?.seed_number || 0);
+    });
+
+    modalHistoryTableBody.innerHTML = userScores
+      .map((s) => {
+        const ch = s.challenges || {};
+        const wk = ch.weeks || {};
+        const modeInfo = detectMapMode(ch.name);
+        const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
+
+        let ptsMapDisplay = "-";
+        let rankMapDisplay = "-";
+        if (currentCalculatedData) {
+          const mapRes = currentCalculatedData.mapResults?.get(ch.id)?.get(userId);
+          if (mapRes) {
+            ptsMapDisplay = formatNum(mapRes.ptsMap);
+            rankMapDisplay = formatRankDisplay(mapRes.rank);
+          }
+        }
+
+        return `
+          <tr>
+            <td style="font-weight: 600; color: #475569;">${escapeHtml(wk.title || `W${ch.week_id}`)}</td>
+            <td style="text-align: left; padding-left: 10px;">
+              <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))}
+            </td>
+            <td><span class="mode-tag ${modeInfo.cls}">${modeInfo.label}</span></td>
+            <td>${formatNum(s.r1)}</td>
+            <td>${formatNum(s.r2)}</td>
+            <td>${formatNum(s.r3)}</td>
+            <td>${formatNum(s.r4)}</td>
+            <td>${formatNum(s.r5)}</td>
+            <td style="background: #eff6ff; font-weight: 700; color: #1e3a8a;">${formatNum(total)}</td>
+            <td style="background: #00247d; color: white; font-weight: 700;">${ptsMapDisplay}</td>
+            <td>${rankMapDisplay}</td>
+          </tr>
+        `;
+      })
+      .join("");
+  } catch (err) {
+    console.error("Open profile error:", err);
+    modalHistoryTableBody.innerHTML = `<tr><td colspan="11" style="padding: 24px; text-align: center; color: red;">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+};
+
+window.closePlayerProfileModal = function () {
+  document.getElementById("playerProfileModal")?.classList.remove("open");
+};
+
+function detectMapMode(name) {
+  if (!name) return { label: "Standard", cls: "other" };
+  if (/nmpz/i.test(name)) return { label: "NMPZ", cls: "nmpz" };
+  if (/\bnm\b|no\s*move/i.test(name)) return { label: "NM", cls: "nm" };
+  if (/move/i.test(name)) return { label: "Move", cls: "move" };
+  return { label: "Standard", cls: "other" };
+}
+
+// Modal Backdrop Click & Escape Key to close
+window.addEventListener("click", (e) => {
+  if (e.target.classList.contains("modal-backdrop")) {
+    e.target.classList.remove("open");
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    document.querySelectorAll(".modal-backdrop.open").forEach((m) => m.classList.remove("open"));
+  }
+});
+
+/**
+ * 13. Supabase Realtime Setup (Optional, safe fallback)
+ */
+function setupRealtime() {
+  if (!db || realtimeChannel) return;
+
+  try {
+    realtimeChannel = db
+      .channel("public-league-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "weeks" },
+        () => handleRealtimeUpdate()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "scores" },
+        () => handleRealtimeUpdate()
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("🟢 Supabase Realtime connected");
+        }
+      });
+  } catch (err) {
+    console.warn("Realtime initialization skipped:", err);
+  }
+}
+
+function handleRealtimeUpdate() {
+  clearTimeout(realtimeDebounceTimer);
+  realtimeDebounceTimer = setTimeout(async () => {
+    console.log("🔄 Realtime update triggered - refreshing active week data");
+    if (currentWeek) {
+      await selectWeek(currentWeek.id);
+    }
+  }, 2000);
+}
 
 /**
  * Render Country Flag Emojis into real flag images using Flagcdn

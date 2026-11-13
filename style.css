@@ -723,12 +723,202 @@ kbd {
   margin: 0 3px 0 1px;
 }
 
+/* ====================================================================
+   5. Custom Additions: Badges, Links, Season Standings & Profile Modal
+   ==================================================================== */
+
+/* [x/7] Played Maps Badge */
+.played-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  font-weight: 700;
+  vertical-align: middle;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  letter-spacing: 0.3px;
+}
+
+.played-badge.complete {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+/* Clickable Player Link */
+.player-link {
+  cursor: pointer;
+  color: #0f172a;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.player-link:hover {
+  color: var(--navy-primary);
+  text-decoration: underline;
+}
+
+/* Season Tab */
+.excel-tab.season-tab {
+  background: #1e293b;
+  color: #fbbf24;
+  border-color: #d97706;
+}
+
+.excel-tab.season-tab:hover {
+  background: #334155;
+  color: #fef08a;
+}
+
+.excel-tab.season-tab.active {
+  background: #00247d;
+  color: #fef08a;
+  border-color: var(--gold-accent);
+}
+
+/* Mode Tags */
+.mode-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mode-tag.move {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.mode-tag.nm {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.mode-tag.nmpz {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.mode-tag.other {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Modal Backdrop & Dialog */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 21, 38, 0.75);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(3px);
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.profile-modal-box {
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 860px;
+  padding: 24px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 2px solid var(--navy-primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.modal-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.modal-close-btn:hover {
+  color: #dc2626;
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.profile-stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.profile-stat-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--navy-primary);
+  margin-top: 2px;
+}
+
+.profile-stat-lbl {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Season view info bar */
+.season-info-bar {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  color: #1e3a8a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 768px) {
   .rules-lang-switch {
     justify-content: center;
     flex-wrap: wrap;
   }
   .rules-card {
+    padding: 16px;
+  }
+  .profile-modal-box {
     padding: 16px;
   }
 }
