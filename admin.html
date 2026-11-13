@@ -138,6 +138,24 @@
       overflow-y: auto;
       border: 2px solid var(--navy-primary);
     }
+    .btn-dq {
+      background: #dc2626;
+      color: white;
+      padding: 4px 8px;
+      font-size: 0.78rem;
+    }
+    .btn-dq:hover {
+      background: #b91c1c;
+    }
+    .btn-delete-score {
+      background: #ea580c;
+      color: white;
+      padding: 4px 8px;
+      font-size: 0.78rem;
+    }
+    .btn-delete-score:hover {
+      background: #c2410c;
+    }
   </style>
 </head>
 <body>
@@ -295,6 +313,134 @@
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
           <button type="button" class="btn" style="background: #94a3b8;" onclick="closeEditModal()">ยกเลิก</button>
           <button type="submit" class="btn" style="background: var(--navy-primary);">💾 บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Modal จัดการคะแนนผู้เล่น (Score Manager Modal) -->
+  <div id="scoresModal" class="modal-backdrop">
+    <div class="edit-modal-box" style="max-width: 960px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+        <div>
+          <h2 id="scoresModalTitle" style="color: var(--navy-primary); font-size: 1.3rem;">📊 จัดการคะแนนผู้เล่น</h2>
+          <p id="scoresModalSubtitle" style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">สัปดาห์: -</p>
+        </div>
+        <button class="modal-close" onclick="closeScoresModal()">&times;</button>
+      </div>
+
+      <!-- Controls bar: Map Filter + Player Search + Add Manual Score Button -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <div>
+            <label style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">เลือกแมพ:</label>
+            <select id="scoresFilterMap" style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1;" onchange="renderScoresList()">
+              <option value="all">🗺️ ทุกแมพ (All Maps)</option>
+              <option value="1">Map 1</option>
+              <option value="2">Map 2</option>
+              <option value="3">Map 3</option>
+              <option value="4">Map 4</option>
+              <option value="5">Map 5</option>
+              <option value="6">Map 6</option>
+              <option value="7">Map 7</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">ค้นหาผู้เล่น (Search Pseudo):</label>
+            <input type="text" id="scoresSearchInput" placeholder="พิมพ์ชื่อผู้เล่น..." style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 180px;" oninput="renderScoresList()">
+          </div>
+        </div>
+
+        <button class="btn" style="background: #16a34a; color: white;" onclick="openManualScoreForm()">
+          ➕ เพิ่ม / แก้ไขคะแนนด้วยมือ
+        </button>
+      </div>
+
+      <!-- Quick Stats bar -->
+      <div id="scoresStatsBar" style="font-size: 0.85rem; color: #475569; margin-bottom: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+        <span>พบทั้งหมด: <strong id="scoresTotalCount">0</strong> รายการ</span>
+        <span style="color: #64748b;">(การลบคะแนนจะมีผลต่อการคำนวณ Phantom Score ทันที)</span>
+      </div>
+
+      <!-- Table Container -->
+      <div style="max-height: 480px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <table class="rules-table" style="margin: 0; font-size: 0.85rem; width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #f1f5f9;">
+              <th style="width: 50px; padding: 8px;">#</th>
+              <th style="text-align: left; padding: 8px 12px; width: 160px;">ผู้เล่น (Pseudo)</th>
+              <th style="width: 140px; padding: 8px;">แมพ (Map)</th>
+              <th style="width: 65px; padding: 8px;">R1</th>
+              <th style="width: 65px; padding: 8px;">R2</th>
+              <th style="width: 65px; padding: 8px;">R3</th>
+              <th style="width: 65px; padding: 8px;">R4</th>
+              <th style="width: 65px; padding: 8px;">R5</th>
+              <th style="width: 85px; background: #eff6ff; color: #1e3a8a; padding: 8px;">Total (25k)</th>
+              <th style="width: 180px; padding: 8px;">จัดการ (Actions)</th>
+            </tr>
+          </thead>
+          <tbody id="scoresTableBody">
+            <!-- Dynamic scores rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button class="btn" style="background: #64748b;" onclick="closeScoresModal()">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Modal เพิ่ม/แก้ไขคะแนนด้วยมือ (Manual Score Modal) -->
+  <div id="manualScoreModal" class="modal-backdrop" style="z-index: 1100;">
+    <div class="edit-modal-box" style="max-width: 500px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 14px;">
+        <h3 style="color: var(--navy-primary); font-size: 1.15rem;">➕ เพิ่ม / แก้ไขคะแนนด้วยมือ</h3>
+        <button class="modal-close" onclick="closeManualScoreModal()">&times;</button>
+      </div>
+
+      <form id="manualScoreForm">
+        <div class="form-group">
+          <label>เลือก Map:</label>
+          <select id="manualMapSelect" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1;"></select>
+        </div>
+
+        <div class="form-group">
+          <label>ชื่อผู้เล่น (Pseudo / Username):</label>
+          <input type="text" id="manualUsername" placeholder="เช่น player_thai" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0;">
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R1 (0-5k):</label>
+            <input type="number" id="manualR1" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R2 (0-5k):</label>
+            <input type="number" id="manualR2" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R3 (0-5k):</label>
+            <input type="number" id="manualR3" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R4 (0-5k):</label>
+            <input type="number" id="manualR4" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R5 (0-5k):</label>
+            <input type="number" id="manualR5" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+          </div>
+        </div>
+
+        <div style="background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: right; margin-bottom: 14px;">
+          คะแนนรวม 5 รอบ (Total): <strong id="manualTotalScore" style="color: #00247d; font-size: 1.1rem;">0</strong> / 25,000
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn" style="background: #94a3b8;" onclick="closeManualScoreModal()">ยกเลิก</button>
+          <button type="submit" class="btn" style="background: #16a34a;">💾 บันทึกคะแนน</button>
         </div>
       </form>
     </div>

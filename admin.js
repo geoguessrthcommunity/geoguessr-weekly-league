@@ -161,6 +161,7 @@ async function loadWeeks() {
                   ? `<button class="btn btn-unfreeze" onclick="toggleFreeze(${w.id}, false)">🔓 ปลด Freeze (เปิดแข่งต่อ)</button>`
                   : `<button class="btn btn-freeze" onclick="toggleFreeze(${w.id}, true)">❄️ Freeze ทันที</button>`
               }
+              <button class="btn" style="background: #0284c7; color: white;" onclick="openScoresModal(${w.id}, '${escapeHtml(w.title)}')">📊 จัดการคะแนน</button>
               <button class="btn btn-edit" onclick="openEditModal(${w.id})">✏️ แก้ไขข้อมูล & 7 Maps</button>
               ${
                 !w.is_active
@@ -291,6 +292,58 @@ editWeekForm.addEventListener("submit", async (e) => {
   }
 
   try {
+    // 0. ตรวจสอบการเปลี่ยน Token ของแต่ละ Map ว่ามีคะแนนเดิมค้างอยู่หรือไม่
+    const { data: existingChallenges, error: exErr } = await adminDb
+      .from("challenges")
+      .select("id, seed_number, token, name")
+      .eq("week_id", weekId);
+
+    if (exErr) throw exErr;
+
+    const mapsWithChangedToken = [];
+    if (existingChallenges && existingChallenges.length > 0) {
+      for (const ch of challengesToUpsert) {
+        const oldCh = existingChallenges.find((ec) => ec.seed_number === ch.seed_number);
+        if (oldCh && oldCh.token !== ch.token) {
+          // มีการเปลี่ยนโทเคน -> ตรวจสอบว่าแมพเก่ามีคะแนนบันทึกอยู่หรือไม่
+          const { count, error: countErr } = await adminDb
+            .from("scores")
+            .select("*", { count: "exact", head: true })
+            .eq("challenge_id", oldCh.id);
+
+          if (!countErr && count > 0) {
+            mapsWithChangedToken.push({
+              oldId: oldCh.id,
+              seed: ch.seed_number,
+              name: oldCh.name || `Map ${ch.seed_number}`,
+              count: count,
+            });
+          }
+        }
+      }
+    }
+
+    // ถ้าตรวจพบคะแนนเดิมในแมพที่เปลี่ยน Token ให้เตือน Admin ยืนยันการล้างคะแนนเก่า
+    if (mapsWithChangedToken.length > 0) {
+      const warningList = mapsWithChangedToken
+        .map((m) => `• Map ${m.seed} (${m.name}): มีคะแนนเดิมค้างอยู่ ${m.count} รายการ`)
+        .join("\n");
+
+      const confirmMsg =
+        `⚠️ มีการเปลี่ยนลิงก์ Challenge Token ในแมพต่อไปนี้:\n\n` +
+        warningList +
+        `\n\nการเปลี่ยนลิงก์คือการเปลี่ยน seed การแข่งขันใหม่ คะแนนเดิมของแมพเหล่านี้จะไม่สามารถนำมารวมกับผู้เล่นใน seed ใหม่ได้ จึงต้องถูกล้างออก\n\nคุณยืนยันที่จะเปลี่ยนลิงก์และล้างคะแนนเดิมของแมพเหล่านี้หรือไม่?`;
+
+      if (!confirm(confirmMsg)) {
+        return; // ยกเลิก ไม่บันทึก
+      }
+
+      // ดำเนินการลบคะแนนของแมพที่เปลี่ยน token
+      for (const m of mapsWithChangedToken) {
+        await adminDb.from("scores").delete().eq("challenge_id", m.oldId);
+      }
+    }
+
     // 1. อัปเดตข้อมูลสัปดาห์
     const { error: wErr } = await adminDb
       .from("weeks")
@@ -311,7 +364,10 @@ editWeekForm.addEventListener("submit", async (e) => {
 
     if (chErr) throw chErr;
 
-    alert("✅ บันทึกการแก้ไขสัปดาห์และ 7 Maps เรียบร้อยแล้ว!");
+    alert(
+      "✅ บันทึกการแก้ไขสัปดาห์และ 7 Maps เรียบร้อยแล้ว!" +
+        (mapsWithChangedToken.length > 0 ? "\n(ล้างคะแนนเก่าของ Map ที่เปลี่ยนลิงก์เรียบร้อยแล้ว)" : "")
+    );
     closeEditModal();
     loadWeeks();
   } catch (err) {
@@ -447,6 +503,299 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ==========================================
+// 5. จัดการคะแนนผู้เล่น (Score Manager)
+// ==========================================
+let currentScoresWeekId = null;
+let currentWeekChallenges = [];
+let currentWeekScores = [];
+
+window.openScoresModal = async function (weekId, weekTitle) {
+  currentScoresWeekId = weekId;
+  const modal = document.getElementById("scoresModal");
+  document.getElementById("scoresModalTitle").textContent = `📊 จัดการคะแนนผู้เล่น`;
+  document.getElementById("scoresModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
+  document.getElementById("scoresSearchInput").value = "";
+  document.getElementById("scoresFilterMap").value = "all";
+
+  modal.classList.add("open");
+  await loadScoresForWeek(weekId);
+};
+
+window.closeScoresModal = function () {
+  document.getElementById("scoresModal").classList.remove("open");
+};
+
+async function loadScoresForWeek(weekId) {
+  if (!adminDb) return;
+  const tbody = document.getElementById("scoresTableBody");
+  tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #64748b;">⏳ กำลังโหลดข้อมูลคะแนน...</td></tr>`;
+
+  try {
+    // 1. ดึง Challenges ทั้งหมดของสัปดาห์นี้
+    const { data: challenges, error: chErr } = await adminDb
+      .from("challenges")
+      .select("id, seed_number, name")
+      .eq("week_id", weekId)
+      .order("seed_number", { ascending: true });
+
+    if (chErr) throw chErr;
+    currentWeekChallenges = challenges || [];
+
+    if (currentWeekChallenges.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบข้อมูล Map ในสัปดาห์นี้</td></tr>`;
+      return;
+    }
+
+    const chIds = currentWeekChallenges.map((c) => c.id);
+
+    // 2. ดึงคะแนนทั้งหมดของ Challenges ในสัปดาห์นี้ พร้อมข้อมูล players
+    const { data: scores, error: scErr } = await adminDb
+      .from("scores")
+      .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, players(id, username)")
+      .in("challenge_id", chIds)
+      .order("total_score", { ascending: false });
+
+    if (scErr) throw scErr;
+    currentWeekScores = scores || [];
+
+    renderScoresList();
+  } catch (err) {
+    console.error("Load Scores Error:", err);
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: red; padding: 24px;">เกิดข้อผิดพลาดในการโหลดคะแนน: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+window.renderScoresList = function () {
+  const mapFilter = document.getElementById("scoresFilterMap").value;
+  const searchFilter = (document.getElementById("scoresSearchInput").value || "").trim().toLowerCase();
+  const tbody = document.getElementById("scoresTableBody");
+
+  const chMap = {};
+  currentWeekChallenges.forEach((c) => {
+    chMap[c.id] = c;
+  });
+
+  const filtered = currentWeekScores.filter((s) => {
+    const ch = chMap[s.challenge_id];
+    if (mapFilter !== "all") {
+      if (!ch || String(ch.seed_number) !== mapFilter) return false;
+    }
+    if (searchFilter) {
+      const uName = (s.players?.username || "").toLowerCase();
+      if (!uName.includes(searchFilter)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById("scoresTotalCount").textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบคะแนนที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered
+    .map((s, idx) => {
+      const ch = chMap[s.challenge_id] || { seed_number: "?", name: "Unknown" };
+      const username = s.players?.username || `Player #${s.player_id}`;
+      const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
+
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="text-align: center; padding: 8px; color: #64748b;">${idx + 1}</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #1e293b;">${escapeHtml(username)}</td>
+          <td style="text-align: center; padding: 8px;">
+            <span style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;">
+              Map ${ch.seed_number}
+            </span>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${renderFlags(escapeHtml(ch.name || ""))}</div>
+          </td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r1 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r2 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r3 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r4 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r5 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; font-weight: bold; background: #f8fafc; color: #00247d;">
+            ${total.toLocaleString()}
+          </td>
+          <td style="text-align: center; padding: 8px;">
+            <div style="display: flex; gap: 4px; justify-content: center;">
+              <button class="btn btn-delete-score" onclick="deleteScore(${s.id})" title="ลบคะแนนแมพนี้เฉพาะรายการนี้">
+                🗑️ ลบแมพนี้
+              </button>
+              <button class="btn btn-dq" onclick="disqualifyPlayerByScore(${s.id})" title="ตัดสิทธิ์ผู้เล่นคนนี้ ล้างคะแนนทุกแมพในสัปดาห์นี้">
+                🚫 DQ วีคนี้
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+};
+
+window.deleteScore = async function (scoreId) {
+  if (!adminDb) return;
+  const s = currentWeekScores.find((x) => x.id === scoreId);
+  const ch = currentWeekChallenges.find((c) => c.id === s?.challenge_id);
+  const pseudo = s?.players?.username || "ผู้เล่น";
+  const mapName = ch ? `Map ${ch.seed_number}` : "แมพนี้";
+
+  if (!confirm(`คุณต้องการลบคะแนนของ "${pseudo}" ใน ${mapName} ใช่หรือไม่?`)) return;
+
+  try {
+    const { error } = await adminDb.from("scores").delete().eq("id", scoreId);
+    if (error) throw error;
+    currentWeekScores = currentWeekScores.filter((x) => x.id !== scoreId);
+    renderScoresList();
+  } catch (err) {
+    console.error("Delete score error:", err);
+    alert("เกิดข้อผิดพลาดในการลบคะแนน: " + err.message);
+  }
+};
+
+window.disqualifyPlayerByScore = async function (scoreId) {
+  if (!adminDb) return;
+  const s = currentWeekScores.find((x) => x.id === scoreId);
+  if (!s) return;
+  const pseudo = s.players?.username || `ID ${s.player_id}`;
+  const playerId = s.player_id;
+
+  const countPlayerScores = currentWeekScores.filter((x) => x.player_id === playerId).length;
+
+  if (
+    !confirm(
+      `⚠️ ยืนยันการตัดสิทธิ์ (Disqualify) ผู้เล่น "${pseudo}" หรือไม่?\n\nระบบจะลบคะแนนทั้งหมดของผู้เล่นคนนี้ในสัปดาห์นี้ (${countPlayerScores} แมพ) ออกทันที`
+    )
+  )
+    return;
+
+  try {
+    const chIds = currentWeekChallenges.map((c) => c.id);
+    const { error } = await adminDb
+      .from("scores")
+      .delete()
+      .eq("player_id", playerId)
+      .in("challenge_id", chIds);
+
+    if (error) throw error;
+    currentWeekScores = currentWeekScores.filter((x) => x.player_id !== playerId);
+    renderScoresList();
+    alert(`✅ ตัดสิทธิ์และล้างคะแนนของ "${pseudo}" ในสัปดาห์นี้เรียบร้อยแล้ว`);
+  } catch (err) {
+    console.error("DQ player error:", err);
+    alert("เกิดข้อผิดพลาดในการตัดสิทธิ์ผู้เล่น: " + err.message);
+  }
+};
+
+// ==========================================
+// 6. เพิ่ม / แก้ไขคะแนนด้วยมือ (Manual Scores)
+// ==========================================
+window.openManualScoreForm = function () {
+  if (!currentScoresWeekId || currentWeekChallenges.length === 0) {
+    alert("ไม่พบข้อมูล Map สำหรับสัปดาห์นี้");
+    return;
+  }
+  const select = document.getElementById("manualMapSelect");
+  select.innerHTML = currentWeekChallenges
+    .map((c) => `<option value="${c.id}">Map ${c.seed_number}: ${escapeHtml(c.name || "")}</option>`)
+    .join("");
+
+  document.getElementById("manualUsername").value = "";
+  document.getElementById("manualR1").value = "0";
+  document.getElementById("manualR2").value = "0";
+  document.getElementById("manualR3").value = "0";
+  document.getElementById("manualR4").value = "0";
+  document.getElementById("manualR5").value = "0";
+  calcManualTotal();
+
+  document.getElementById("manualScoreModal").classList.add("open");
+};
+
+window.closeManualScoreModal = function () {
+  document.getElementById("manualScoreModal").classList.remove("open");
+};
+
+window.calcManualTotal = function () {
+  const r1 = parseInt(document.getElementById("manualR1").value, 10) || 0;
+  const r2 = parseInt(document.getElementById("manualR2").value, 10) || 0;
+  const r3 = parseInt(document.getElementById("manualR3").value, 10) || 0;
+  const r4 = parseInt(document.getElementById("manualR4").value, 10) || 0;
+  const r5 = parseInt(document.getElementById("manualR5").value, 10) || 0;
+  const total = r1 + r2 + r3 + r4 + r5;
+  document.getElementById("manualTotalScore").textContent = total.toLocaleString();
+};
+
+const manualScoreForm = document.getElementById("manualScoreForm");
+if (manualScoreForm) {
+  manualScoreForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!adminDb) return;
+
+    const challengeId = Number(document.getElementById("manualMapSelect").value);
+    const username = document.getElementById("manualUsername").value.trim();
+    const r1 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR1").value, 10) || 0));
+    const r2 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR2").value, 10) || 0));
+    const r3 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR3").value, 10) || 0));
+    const r4 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR4").value, 10) || 0));
+    const r5 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR5").value, 10) || 0));
+    const total = r1 + r2 + r3 + r4 + r5;
+
+    if (!username) {
+      alert("กรุณากรอกชื่อผู้เล่น");
+      return;
+    }
+
+    try {
+      // 1. ค้นหาผู้เล่นเดิม หรือสร้าง ID จำลองสำหรับผู้เล่นนี้
+      let playerId = null;
+      const { data: existingPlayers } = await adminDb
+        .from("players")
+        .select("id, username")
+        .ilike("username", username)
+        .limit(1);
+
+      if (existingPlayers && existingPlayers.length > 0) {
+        playerId = existingPlayers[0].id;
+      } else {
+        playerId = "manual_" + Math.random().toString(36).substring(2, 8) + Date.now().toString(36);
+        const { error: pErr } = await adminDb.from("players").insert({
+          id: playerId,
+          username: username,
+          updated_at: new Date().toISOString(),
+        });
+        if (pErr) throw pErr;
+      }
+
+      // 2. บันทึกคะแนนลงตาราง scores (upsert)
+      const { error: sErr } = await adminDb.from("scores").upsert(
+        {
+          challenge_id: challengeId,
+          player_id: playerId,
+          r1,
+          r2,
+          r3,
+          r4,
+          r5,
+          total_score: total,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "challenge_id,player_id" }
+      );
+
+      if (sErr) throw sErr;
+
+      alert(`✅ บันทึกคะแนนของ "${username}" เรียบร้อยแล้ว! (Total: ${total.toLocaleString()})`);
+      closeManualScoreModal();
+      await loadScoresForWeek(currentScoresWeekId);
+    } catch (err) {
+      console.error("Save manual score error:", err);
+      alert("เกิดข้อผิดพลาดในการบันทึกคะแนน: " + err.message);
+    }
+  });
 }
 
 checkAuth();
