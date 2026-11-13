@@ -798,4 +798,16 @@ if (manualScoreForm) {
   });
 }
 
+// ปิด Modal เมื่อคลิกพื้นที่ด้านนอก (Backdrop Click) หรือกด Esc
+window.addEventListener("click", (e) => {
+  if (e.target.classList.contains("modal-backdrop")) {
+    e.target.classList.remove("open");
+  }
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    document.querySelectorAll(".modal-backdrop.open").forEach((m) => m.classList.remove("open"));
+  }
+});
+
 checkAuth();
