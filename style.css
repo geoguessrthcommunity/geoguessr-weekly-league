@@ -748,17 +748,24 @@ kbd {
   border-color: #86efac;
 }
 
-/* Clickable Player Link */
+/* Clickable Player Link (Season Standings only) */
+.player-name {
+  color: #0f172a;
+  font-weight: 600;
+}
+
 .player-link {
   cursor: pointer;
-  color: #0f172a;
+  color: var(--navy-primary);
+  font-weight: 700;
   text-decoration: none;
-  transition: color 0.15s ease;
+  border-bottom: 1px dotted var(--navy-primary);
+  transition: all 0.15s ease;
 }
 
 .player-link:hover {
-  color: var(--navy-primary);
-  text-decoration: underline;
+  color: #0284c7;
+  border-bottom: 1px solid #0284c7;
 }
 
 /* Season Tab */

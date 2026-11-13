@@ -45,11 +45,13 @@ const rawTableBody = document.getElementById("rawTableBody");
 
 const formatNum = (num) => (num !== undefined && num !== null ? Number(num).toLocaleString() : "-");
 
-function formatRankDisplay(rank) {
-  if (rank === 1) return `🥇 1`;
-  if (rank === 2) return `🥈 2`;
-  if (rank === 3) return `🥉 3`;
-  return `${rank}`;
+function formatRankDisplay(rank, total) {
+  if (rank === undefined || rank === null || rank === "-") return "-";
+  const suffix = total ? `<span style="font-size: 0.75em; color: #64748b; font-weight: 500;">/${total}</span>` : "";
+  if (rank === 1) return `🥇 1${suffix}`;
+  if (rank === 2) return `🥈 2${suffix}`;
+  if (rank === 3) return `🥉 3${suffix}`;
+  return `${rank}${suffix}`;
 }
 
 /**
@@ -477,6 +479,7 @@ function computeWeekStandings(challenges, scores) {
           username: p.username,
           ptsMap: p.ptsMap,
           rank: p.mapRank,
+          totalPlayers: pList.length,
           raw: p.raw,
           phantoms: p.phantoms,
           points: p.points,
@@ -542,7 +545,7 @@ function calculateAndRenderScores(scores, challenges) {
 
   scoresTableBody.innerHTML = leaderboard
     .map((p) => {
-      const posDisplay = formatRankDisplay(p.overallRank);
+      const posDisplay = formatRankDisplay(p.overallRank, leaderboard.length);
 
       // Count played maps out of total challenges
       const playedMapsCount = challenges.filter((c) => p.maps[c.id]).length;
@@ -560,7 +563,7 @@ function calculateAndRenderScores(scores, challenges) {
             `;
           }
 
-          const rankDisplay = formatRankDisplay(mData.rank);
+          const rankDisplay = formatRankDisplay(mData.rank, mData.totalPlayers);
 
           return `
             <td class="col-pts">${formatNum(mData.ptsMap)}</td>
@@ -573,7 +576,7 @@ function calculateAndRenderScores(scores, challenges) {
         <tr>
           <td class="col-pos">${posDisplay}</td>
           <td class="col-player" title="${escapeHtml(p.username)}">
-            <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view player profile">${escapeHtml(p.username)}</a>${playedBadge}
+            <span class="player-name">${escapeHtml(p.username)}</span>${playedBadge}
           </td>
           <td class="col-total">${formatNum(p.grandTotal)}</td>
           ${mapCols}
@@ -618,7 +621,7 @@ function renderRawScoresView() {
 
   rawTableBody.innerHTML = playersList
     .map((p) => {
-      const rankDisplay = formatRankDisplay(p.rank);
+      const rankDisplay = formatRankDisplay(p.rank, playersList.length);
 
       const roundCells = [0, 1, 2, 3, 4]
         .map((rIdx) => {
@@ -646,7 +649,7 @@ function renderRawScoresView() {
         <tr>
           <td class="col-pos">${rankDisplay}</td>
           <td class="col-player">
-            <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view player profile">${escapeHtml(p.username)}</a>
+            <span class="player-name">${escapeHtml(p.username)}</span>
           </td>
           ${roundCells}
           ${totalCell}
@@ -740,7 +743,7 @@ async function loadAndRenderSeasonStandings() {
       const wChIds = new Set(wChallenges.map((c) => c.id));
       const wScores = (scores || []).filter((s) => wChIds.has(s.challenge_id));
 
-      const { leaderboard } = computeWeekStandings(wChallenges, wScores);
+      const { leaderboard, mapResults } = computeWeekStandings(wChallenges, wScores);
       const N = leaderboard.length;
 
       leaderboard.forEach((p) => {
@@ -763,6 +766,7 @@ async function loadAndRenderSeasonStandings() {
         cp.weekStats[w.id] = {
           pts: seasonPts,
           rank: p.overallRank,
+          totalInWeek: N,
           grandTotal: p.grandTotal,
         };
 
@@ -771,7 +775,7 @@ async function loadAndRenderSeasonStandings() {
         else if (p.overallRank === 3) cp.podiums.bronze++;
       });
 
-      weeklyStandingsMap.set(w.id, { leaderboard, N });
+      weeklyStandingsMap.set(w.id, { leaderboard, mapResults, N });
     });
 
     const finalSeasonList = Array.from(playerCumulative.values()).sort(
@@ -806,7 +810,7 @@ async function loadAndRenderSeasonStandings() {
 
     seasonTableBody.innerHTML = finalSeasonList
       .map((p) => {
-        const posDisplay = formatRankDisplay(p.seasonRank);
+        const posDisplay = formatRankDisplay(p.seasonRank, finalSeasonList.length);
 
         const weekCols = frozenWeeks
           .map((w) => {
@@ -817,7 +821,7 @@ async function loadAndRenderSeasonStandings() {
             return `
               <td class="col-pts" style="text-align: center;">
                 <div style="font-weight: 700; color: #00247d;">+${formatNum(st.pts)}</div>
-                <div style="font-size: 0.72rem; color: #64748b;">${formatRankDisplay(st.rank)}</div>
+                <div style="font-size: 0.72rem; color: #64748b;">${formatRankDisplay(st.rank, st.totalInWeek)}</div>
               </td>
             `;
           })
@@ -866,6 +870,11 @@ window.openPlayerProfile = async function (userId) {
   modal.classList.add("open");
 
   try {
+    // Ensure season standings cache is loaded for accurate frozen stats
+    if (!seasonStandingsCache) {
+      await loadAndRenderSeasonStandings();
+    }
+
     const { data: scores, error: scErr } = await db
       .from("scores")
       .select("*, challenges(*, weeks(*)), players(username)")
@@ -873,9 +882,41 @@ window.openPlayerProfile = async function (userId) {
 
     if (scErr) throw scErr;
 
-    const userScores = scores || [];
-    const username = userScores[0]?.players?.username || "Player";
+    const allScores = scores || [];
+    const username = allScores[0]?.players?.username || "Player";
     modalPlayerUsername.textContent = username;
+
+    // Filter to ONLY include scores from completed (frozen) weeks to avoid spoilers for ongoing weeks!
+    const userScores = allScores.filter(
+      (s) => s.challenges?.weeks?.is_frozen === true
+    );
+
+    // Season stats from season cache if available
+    let seasonPts = "0";
+    let podiumsStr = "-";
+    if (seasonStandingsCache) {
+      const pData = seasonStandingsCache.finalSeasonList?.find((p) => p.userId === userId);
+      if (pData) {
+        seasonPts = formatNum(pData.totalSeasonPts);
+        podiumsStr = `${pData.podiums.gold}🥇 ${pData.podiums.silver}🥈 ${pData.podiums.bronze}🥉`;
+      }
+    }
+    statSeasonPts.textContent = seasonPts;
+    statPodiums.textContent = podiumsStr;
+
+    if (userScores.length === 0) {
+      stat5kRounds.textContent = "0";
+      stat25kGames.textContent = "0";
+      statWeeksPlayed.textContent = "0";
+      modalHistoryTableBody.innerHTML = `
+        <tr>
+          <td colspan="11" style="padding: 30px; text-align: center; color: #64748b;">
+            🔒 No recorded scores from completed (frozen) weeks yet.<br>
+            <span style="font-size: 0.8rem; color: #94a3b8;">(Scores from ongoing active weeks are hidden to prevent spoilers)</span>
+          </td>
+        </tr>`;
+      return;
+    }
 
     let count5k = 0;
     let count25k = 0;
@@ -893,23 +934,6 @@ window.openPlayerProfile = async function (userId) {
     stat25kGames.textContent = count25k.toLocaleString();
     statWeeksPlayed.textContent = uniqueWeeks.size.toLocaleString();
 
-    let seasonPts = "-";
-    let podiumsStr = "-";
-    if (seasonStandingsCache) {
-      const pData = seasonStandingsCache.finalSeasonList?.find((p) => p.userId === userId);
-      if (pData) {
-        seasonPts = formatNum(pData.totalSeasonPts);
-        podiumsStr = `${pData.podiums.gold}🥇 ${pData.podiums.silver}🥈 ${pData.podiums.bronze}🥉`;
-      }
-    }
-    statSeasonPts.textContent = seasonPts;
-    statPodiums.textContent = podiumsStr;
-
-    if (userScores.length === 0) {
-      modalHistoryTableBody.innerHTML = `<tr><td colspan="11" style="padding: 24px; text-align: center;">No recorded games found for this player.</td></tr>`;
-      return;
-    }
-
     userScores.sort((a, b) => {
       const wA = a.challenges?.week_id || 0;
       const wB = b.challenges?.week_id || 0;
@@ -926,12 +950,13 @@ window.openPlayerProfile = async function (userId) {
 
         let ptsMapDisplay = "-";
         let rankMapDisplay = "-";
-        if (currentCalculatedData) {
-          const mapRes = currentCalculatedData.mapResults?.get(ch.id)?.get(userId);
-          if (mapRes) {
-            ptsMapDisplay = formatNum(mapRes.ptsMap);
-            rankMapDisplay = formatRankDisplay(mapRes.rank);
-          }
+
+        const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(ch.week_id);
+        const mapRes = wkStandings?.mapResults?.get(ch.id)?.get(userId);
+
+        if (mapRes) {
+          ptsMapDisplay = formatNum(mapRes.ptsMap);
+          rankMapDisplay = formatRankDisplay(mapRes.rank, mapRes.totalPlayers);
         }
 
         return `
