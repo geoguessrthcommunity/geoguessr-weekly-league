@@ -545,7 +545,7 @@ function calculateAndRenderScores(scores, challenges) {
 
   scoresTableBody.innerHTML = leaderboard
     .map((p) => {
-      const posDisplay = formatRankDisplay(p.overallRank, leaderboard.length);
+      const posDisplay = formatRankDisplay(p.overallRank);
 
       // Count played maps out of total challenges
       const playedMapsCount = challenges.filter((c) => p.maps[c.id]).length;
@@ -563,7 +563,7 @@ function calculateAndRenderScores(scores, challenges) {
             `;
           }
 
-          const rankDisplay = formatRankDisplay(mData.rank, mData.totalPlayers);
+          const rankDisplay = formatRankDisplay(mData.rank);
 
           return `
             <td class="col-pts">${formatNum(mData.ptsMap)}</td>
@@ -621,7 +621,7 @@ function renderRawScoresView() {
 
   rawTableBody.innerHTML = playersList
     .map((p) => {
-      const rankDisplay = formatRankDisplay(p.rank, playersList.length);
+      const rankDisplay = formatRankDisplay(p.rank);
 
       const roundCells = [0, 1, 2, 3, 4]
         .map((rIdx) => {
@@ -810,7 +810,7 @@ async function loadAndRenderSeasonStandings() {
 
     seasonTableBody.innerHTML = finalSeasonList
       .map((p) => {
-        const posDisplay = formatRankDisplay(p.seasonRank, finalSeasonList.length);
+        const posDisplay = formatRankDisplay(p.seasonRank);
 
         const weekCols = frozenWeeks
           .map((w) => {
@@ -821,7 +821,7 @@ async function loadAndRenderSeasonStandings() {
             return `
               <td class="col-pts" style="text-align: center;">
                 <div style="font-weight: 700; color: #00247d;">+${formatNum(st.pts)}</div>
-                <div style="font-size: 0.72rem; color: #64748b;">${formatRankDisplay(st.rank, st.totalInWeek)}</div>
+                <div style="font-size: 0.72rem; color: #64748b;">${formatRankDisplay(st.rank)}</div>
               </td>
             `;
           })
