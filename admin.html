@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,8 @@
   <!-- Google Fonts: Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -16,21 +18,25 @@
       color: #1e293b;
       padding: 20px;
     }
+
     .admin-container {
       max-width: 960px;
       margin: 0 auto;
     }
+
     .admin-card {
       background: white;
       border: 2px solid var(--gold-accent);
       border-radius: 8px;
       padding: 24px;
       margin-bottom: 24px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     }
+
     .form-group {
       margin-bottom: 16px;
     }
+
     label {
       display: block;
       font-weight: 700;
@@ -38,7 +44,10 @@
       font-size: 0.9rem;
       color: var(--navy-primary);
     }
-    input[type="text"], input[type="datetime-local"], input[type="password"] {
+
+    input[type="text"],
+    input[type="datetime-local"],
+    input[type="password"] {
       width: 100%;
       padding: 9px 12px;
       border: 1px solid #cbd5e1;
@@ -46,10 +55,12 @@
       font-size: 0.95rem;
       font-family: inherit;
     }
+
     input:focus {
       border-color: var(--navy-primary);
       outline: none;
     }
+
     .btn {
       background: var(--navy-primary);
       color: white;
@@ -65,22 +76,28 @@
       align-items: center;
       gap: 5px;
     }
+
     .btn:hover {
       opacity: 0.9;
       transform: translateY(-1px);
     }
+
     .btn-freeze {
       background: #0284c7;
     }
+
     .btn-unfreeze {
       background: #16a34a;
     }
+
     .btn-edit {
       background: #d97706;
     }
+
     .btn-danger {
       background: #dc2626;
     }
+
     .map-row {
       display: grid;
       grid-template-columns: 80px 1fr 1fr;
@@ -92,6 +109,7 @@
       border: 1px solid #e2e8f0;
       margin-bottom: 8px;
     }
+
     .week-card-item {
       background: #f8fafc;
       border: 1px solid #cbd5e1;
@@ -102,6 +120,7 @@
       flex-direction: column;
       gap: 12px;
     }
+
     .week-header-row {
       display: flex;
       justify-content: space-between;
@@ -109,6 +128,7 @@
       flex-wrap: wrap;
       gap: 10px;
     }
+
     .week-actions {
       display: flex;
       flex-wrap: wrap;
@@ -123,7 +143,7 @@
       border-radius: 8px;
       border: 2px solid var(--gold-accent);
       padding: 30px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
       text-align: center;
     }
 
@@ -139,6 +159,7 @@
       padding: 16px;
       backdrop-filter: blur(4px);
     }
+
     .modal-backdrop.open {
       display: flex;
     }
@@ -157,6 +178,7 @@
       margin: auto;
       position: relative;
     }
+
     .modal-close {
       background: none;
       border: none;
@@ -167,29 +189,35 @@
       padding: 0 4px;
       transition: color 0.15s ease;
     }
+
     .modal-close:hover {
       color: #dc2626;
     }
+
     .btn-dq {
       background: #dc2626;
       color: white;
       padding: 4px 8px;
       font-size: 0.78rem;
     }
+
     .btn-dq:hover {
       background: #b91c1c;
     }
+
     .btn-delete-score {
       background: #ea580c;
       color: white;
       padding: 4px 8px;
       font-size: 0.78rem;
     }
+
     .btn-delete-score:hover {
       background: #c2410c;
     }
   </style>
 </head>
+
 <body>
   <div class="admin-container">
 
@@ -202,13 +230,15 @@
       </p>
 
       <form id="loginForm">
-        <input type="password" id="loginKeyInput" placeholder="วาง Service Role Key ที่นี่..." required style="margin-bottom: 14px;">
-        <button type="submit" class="btn" style="width: 100%; padding: 10px; justify-content: center; background: var(--thai-red);">
+        <input type="password" id="loginKeyInput" placeholder="วาง Service Role Key ที่นี่..." required
+          style="margin-bottom: 14px;">
+        <button type="submit" class="btn"
+          style="width: 100%; padding: 10px; justify-content: center; background: var(--thai-red);">
           เข้าสู่ระบบ (Login)
         </button>
       </form>
       <div id="loginError" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px; display: none;"></div>
-      
+
       <div style="margin-top: 20px;">
         <a href="index.html" style="font-size: 0.85rem; color: #64748b; text-decoration: none;">← กลับสู่หน้าหลัก</a>
       </div>
@@ -216,16 +246,21 @@
 
     <!-- 2. แผงควบคุมแอดมิน (แสดงเมื่อล็อกอินผ่านแล้วเท่านั้น) -->
     <div id="adminDashboard" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
           <h1 style="color: white; font-size: 1.6rem; font-weight: 800;">⚙️ แผงควบคุมระบบ (Admin Panel)</h1>
-          <p style="color: #94a3b8; font-size: 0.9rem;">จัดการสัปดาห์แข่งขัน, แก้ไข 7 Maps, กฎชดเชยคะแนน, ตรวจสอบผู้เล่น</p>
+          <p style="color: #94a3b8; font-size: 0.9rem;">จัดการสัปดาห์แข่งขัน, แก้ไข 7 Maps, กฎชดเชยคะแนน, ตรวจสอบผู้เล่น
+          </p>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-          <button id="forceSyncBtn" class="btn" style="background: #2563eb;" onclick="triggerForceSync()">⚡ สั่ง Sync ทันที</button>
-          <button class="btn" style="background: #0d9488;" onclick="openPlayerDirectoryModal()">👥 ดูผู้เล่น & สถิติ</button>
+          <button id="forceSyncBtn" class="btn" style="background: #2563eb;" onclick="triggerForceSync()">⚡ สั่ง Sync
+            ทันที</button>
+          <button class="btn" style="background: #0d9488;" onclick="openPlayerDirectoryModal()">👥 ดูผู้เล่น &
+            สถิติ</button>
           <button class="btn" style="background: #059669;" onclick="exportMasterCSV()">📥 Export CSV</button>
-          <a href="index.html" class="btn" style="background: var(--gold-accent); color: #0f172a; text-decoration: none;">← ไปหน้าตารางคะแนน</a>
+          <a href="index.html" class="btn"
+            style="background: var(--gold-accent); color: #0f172a; text-decoration: none;">← ไปหน้าตารางคะแนน</a>
           <button id="logoutBtn" class="btn" style="background: #475569;">🚪 ออกจากระบบ</button>
         </div>
       </div>
@@ -234,7 +269,8 @@
       <div class="admin-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="color: var(--navy-primary); font-size: 1.3rem;">📋 สัปดาห์การแข่งขันทั้งหมด (Manage Weeks)</h2>
-          <button class="btn" onclick="loadWeeks()" style="background: #e2e8f0; color: #334155;">🔄 รีเฟรชรายการ</button>
+          <button class="btn" onclick="loadWeeks()" style="background: #e2e8f0; color: #334155;">🔄
+            รีเฟรชรายการ</button>
         </div>
         <div id="weeksList">
           <p style="color: #64748b;">กำลังโหลด...</p>
@@ -243,7 +279,8 @@
 
       <!-- ฟอร์มสร้างสัปดาห์ใหม่พร้อม 7 Maps -->
       <div class="admin-card">
-        <h2 style="color: var(--navy-primary); font-size: 1.3rem; margin-bottom: 16px;">➕ สร้างสัปดาห์แข่งขันใหม่ (Create New Week)</h2>
+        <h2 style="color: var(--navy-primary); font-size: 1.3rem; margin-bottom: 16px;">➕ สร้างสัปดาห์แข่งขันใหม่
+          (Create New Week)</h2>
         <form id="createWeekForm">
           <div class="form-group">
             <label>ชื่อสัปดาห์ (Week Title):</label>
@@ -252,56 +289,74 @@
 
           <div class="form-group">
             <label>ข้อความแถบข้อมูลด้านบน (Header Info Text):</label>
-            <input type="text" id="weekHeaderInfo" placeholder="เช่น แข่งขัน 10 - 17 พ.ย. || ปิดรับคะแนนวันที่ 17 เวลา 20:00 น.">
+            <input type="text" id="weekHeaderInfo"
+              placeholder="เช่น แข่งขัน 10 - 17 พ.ย. || ปิดรับคะแนนวันที่ 17 เวลา 20:00 น.">
           </div>
 
           <div class="form-group">
             <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
             <input type="datetime-local" id="weekEndDate">
-            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง หรือเช็กปี ค.ศ. ให้ถูกต้อง)</small>
+            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง หรือเช็กปี ค.ศ.
+              ให้ถูกต้อง)</small>
           </div>
 
-          <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ กรอกข้อมูลทั้ง 7 Maps:</h3>
+          <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ กรอกข้อมูลทั้ง 7 Maps:
+          </h3>
 
           <div id="mapsInputsContainer">
             <div class="map-row">
               <strong>Map 1:</strong>
-              <input type="text" class="map-name-input" data-seed="1" placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
-              <input type="text" class="map-url-input" data-seed="1" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="1"
+                placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="1"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 2:</strong>
-              <input type="text" class="map-name-input" data-seed="2" placeholder="ชื่อแมพ & โหมด (เช่น Asia | No move 2')" required>
-              <input type="text" class="map-url-input" data-seed="2" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="2"
+                placeholder="ชื่อแมพ & โหมด (เช่น Asia | No move 2')" required>
+              <input type="text" class="map-url-input" data-seed="2"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 3:</strong>
-              <input type="text" class="map-name-input" data-seed="3" placeholder="ชื่อแมพ & โหมด (เช่น Americas | NM 2')" required>
-              <input type="text" class="map-url-input" data-seed="3" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="3"
+                placeholder="ชื่อแมพ & โหมด (เช่น Americas | NM 2')" required>
+              <input type="text" class="map-url-input" data-seed="3"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 4:</strong>
-              <input type="text" class="map-name-input" data-seed="4" placeholder="ชื่อแมพ & โหมด (เช่น Africa | Move 3')" required>
-              <input type="text" class="map-url-input" data-seed="4" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="4"
+                placeholder="ชื่อแมพ & โหมด (เช่น Africa | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="4"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 5:</strong>
-              <input type="text" class="map-name-input" data-seed="5" placeholder="ชื่อแมพ & โหมด (เช่น World | Move 3')" required>
-              <input type="text" class="map-url-input" data-seed="5" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="5"
+                placeholder="ชื่อแมพ & โหมด (เช่น World | Move 3')" required>
+              <input type="text" class="map-url-input" data-seed="5"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 6:</strong>
-              <input type="text" class="map-name-input" data-seed="6" placeholder="ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')" required>
-              <input type="text" class="map-url-input" data-seed="6" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="6"
+                placeholder="ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')" required>
+              <input type="text" class="map-url-input" data-seed="6"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
             <div class="map-row">
               <strong>Map 7:</strong>
-              <input type="text" class="map-name-input" data-seed="7" placeholder="ชื่อแมพ & โหมด (เช่น AI Community | NM 2')" required>
-              <input type="text" class="map-url-input" data-seed="7" placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+              <input type="text" class="map-name-input" data-seed="7"
+                placeholder="ชื่อแมพ & โหมด (เช่น AI Community | NM 2')" required>
+              <input type="text" class="map-url-input" data-seed="7"
+                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
             </div>
           </div>
 
-          <button type="submit" class="btn" style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; justify-content: center; background: var(--thai-red);">
+          <button type="submit" class="btn"
+            style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; justify-content: center; background: var(--thai-red);">
             🚀 บันทึกและเปิดสัปดาห์แข่งขันใหม่
           </button>
         </form>
@@ -313,14 +368,15 @@
   <!-- 3. Modal แก้ไขข้อมูลสัปดาห์ & 7 Maps -->
   <div id="editWeekModal" class="modal-backdrop">
     <div class="edit-modal-box">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <h2 style="color: var(--navy-primary); font-size: 1.3rem;">✏️ แก้ไขข้อมูลสัปดาห์ & 7 Maps</h2>
         <button class="modal-close" onclick="closeEditModal()">&times;</button>
       </div>
 
       <form id="editWeekForm">
         <input type="hidden" id="editWeekId">
-        
+
         <div class="form-group">
           <label>ชื่อสัปดาห์ (Week Title):</label>
           <input type="text" id="editWeekTitle" required>
@@ -335,12 +391,15 @@
           <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
           <div style="display: flex; gap: 10px;">
             <input type="datetime-local" id="editWeekEndDate">
-            <button type="button" class="btn" style="background: #64748b;" onclick="document.getElementById('editWeekEndDate').value=''">ล้างวันตัดรอบ</button>
+            <button type="button" class="btn" style="background: #64748b;"
+              onclick="document.getElementById('editWeekEndDate').value=''">ล้างวันตัดรอบ</button>
           </div>
-          <small style="color: #64748b;">(ถ้าล้างวันตัดรอบ ระบบจะไม่ Freeze อัตโนมัติ จนกว่าคุณจะมากดปุ่ม Freeze เอง)</small>
+          <small style="color: #64748b;">(ถ้าล้างวันตัดรอบ ระบบจะไม่ Freeze อัตโนมัติ จนกว่าคุณจะมากดปุ่ม Freeze
+            เอง)</small>
         </div>
 
-        <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ แก้ไขรายชื่อและลิงก์ทั้ง 7 Maps:</h3>
+        <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ แก้ไขรายชื่อและลิงก์ทั้ง
+          7 Maps:</h3>
         <div id="editMapsContainer">
           <!-- จะถูกสร้างผ่าน JS ทั้ง 7 แถว -->
         </div>
@@ -356,7 +415,8 @@
   <!-- 4. Modal จัดการคะแนนผู้เล่น (Score Manager Modal) -->
   <div id="scoresModal" class="modal-backdrop">
     <div class="edit-modal-box" style="max-width: 960px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
           <h2 id="scoresModalTitle" style="color: var(--navy-primary); font-size: 1.3rem;">📊 จัดการคะแนนผู้เล่น</h2>
           <p id="scoresModalSubtitle" style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">สัปดาห์: -</p>
@@ -365,11 +425,15 @@
       </div>
 
       <!-- Controls bar: Map Filter + Player Search + Add Manual Score Button -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">เลือกแมพ:</label>
-            <select id="scoresFilterMap" style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1;" onchange="renderScoresList()">
+            <label
+              style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">เลือกแมพ:</label>
+            <select id="scoresFilterMap"
+              style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1;"
+              onchange="renderScoresList()">
               <option value="all">🗺️ ทุกแมพ (All Maps)</option>
               <option value="1">Map 1</option>
               <option value="2">Map 2</option>
@@ -382,18 +446,28 @@
           </div>
 
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">ค้นหาผู้เล่น (Search Pseudo):</label>
-            <input type="text" id="scoresSearchInput" placeholder="พิมพ์ชื่อผู้เล่น..." style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 180px;" oninput="renderScoresList()">
+            <label
+              style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 2px;">ค้นหาผู้เล่น
+              (Search Pseudo):</label>
+            <input type="text" id="scoresSearchInput" placeholder="พิมพ์ชื่อผู้เล่น..."
+              style="padding: 6px 10px; font-size: 0.85rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 180px;"
+              oninput="renderScoresList()">
           </div>
         </div>
 
-        <button class="btn" style="background: #16a34a; color: white;" onclick="openManualScoreForm()">
-          ➕ เพิ่ม / แก้ไขคะแนนด้วยมือ
-        </button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn" style="background: #0d9488; color: white;" onclick="openInspectorFromScoresModal()">
+            🧮 ตรวจสอบการคิดคะแนน
+          </button>
+          <button class="btn" style="background: #16a34a; color: white;" onclick="openManualScoreForm()">
+            ➕ เพิ่ม / แก้ไขคะแนนด้วยมือ
+          </button>
+        </div>
       </div>
 
       <!-- Quick Stats bar -->
-      <div id="scoresStatsBar" style="font-size: 0.85rem; color: #475569; margin-bottom: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+      <div id="scoresStatsBar"
+        style="font-size: 0.85rem; color: #475569; margin-bottom: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
         <span>พบทั้งหมด: <strong id="scoresTotalCount">0</strong> รายการ</span>
         <span style="color: #64748b;">(การลบคะแนนจะมีผลต่อการคำนวณ Phantom Score ทันที)</span>
       </div>
@@ -430,7 +504,8 @@
   <!-- 5. Modal เพิ่ม/แก้ไขคะแนนด้วยมือ (Manual Score Modal) -->
   <div id="manualScoreModal" class="modal-backdrop" style="z-index: 1100;">
     <div class="edit-modal-box" style="max-width: 500px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 14px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 14px;">
         <h3 style="color: var(--navy-primary); font-size: 1.15rem;">➕ เพิ่ม / แก้ไขคะแนนด้วยมือ</h3>
         <button class="modal-close" onclick="closeManualScoreModal()">&times;</button>
       </div>
@@ -438,7 +513,8 @@
       <form id="manualScoreForm">
         <div class="form-group">
           <label>เลือก Map:</label>
-          <select id="manualMapSelect" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1;"></select>
+          <select id="manualMapSelect" required
+            style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1;"></select>
         </div>
 
         <div class="form-group">
@@ -449,32 +525,39 @@
         <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0;">
           <div>
             <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R1 (0-5k):</label>
-            <input type="number" id="manualR1" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+            <input type="number" id="manualR1" min="0" max="5000" value="0" required
+              style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
           </div>
           <div>
             <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R2 (0-5k):</label>
-            <input type="number" id="manualR2" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+            <input type="number" id="manualR2" min="0" max="5000" value="0" required
+              style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
           </div>
           <div>
             <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R3 (0-5k):</label>
-            <input type="number" id="manualR3" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+            <input type="number" id="manualR3" min="0" max="5000" value="0" required
+              style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
           </div>
           <div>
             <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R4 (0-5k):</label>
-            <input type="number" id="manualR4" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+            <input type="number" id="manualR4" min="0" max="5000" value="0" required
+              style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
           </div>
           <div>
             <label style="font-size: 0.75rem; font-weight: bold; color: #475569;">R5 (0-5k):</label>
-            <input type="number" id="manualR5" min="0" max="5000" value="0" required style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
+            <input type="number" id="manualR5" min="0" max="5000" value="0" required
+              style="padding: 6px; width: 100%; text-align: center;" oninput="calcManualTotal()">
           </div>
         </div>
 
         <div style="background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: right; margin-bottom: 14px;">
-          คะแนนรวม 5 รอบ (Total): <strong id="manualTotalScore" style="color: #00247d; font-size: 1.1rem;">0</strong> / 25,000
+          คะแนนรวม 5 รอบ (Total): <strong id="manualTotalScore" style="color: #00247d; font-size: 1.1rem;">0</strong> /
+          25,000
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" class="btn" style="background: #94a3b8;" onclick="closeManualScoreModal()">ยกเลิก</button>
+          <button type="button" class="btn" style="background: #94a3b8;"
+            onclick="closeManualScoreModal()">ยกเลิก</button>
           <button type="submit" class="btn" style="background: #16a34a;">💾 บันทึกคะแนน</button>
         </div>
       </form>
@@ -484,17 +567,21 @@
   <!-- 6. Modal กฎปรับคะแนนพิเศษ (Score Adjustments Modal) -->
   <div id="adjustmentsModal" class="modal-backdrop">
     <div class="edit-modal-box" style="max-width: 820px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
-          <h2 id="adjModalTitle" style="color: var(--navy-primary); font-size: 1.3rem;">🛠️ กฎปรับคะแนนพิเศษ (Score Adjustments)</h2>
+          <h2 id="adjModalTitle" style="color: var(--navy-primary); font-size: 1.3rem;">🛠️ กฎปรับคะแนนพิเศษ (Score
+            Adjustments)</h2>
           <p id="adjModalSubtitle" style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">สัปดาห์: -</p>
         </div>
         <button class="modal-close" onclick="closeAdjustmentsModal()">&times;</button>
       </div>
 
       <!-- Form สร้างกฎใหม่ -->
-      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
-        <h3 style="color: #1e293b; font-size: 1.05rem; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+      <div
+        style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+        <h3
+          style="color: #1e293b; font-size: 1.05rem; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
           <span>➕</span> ตั้งกฎชดเชยคะแนนสำหรับแมพที่มีปัญหา:
         </h3>
 
@@ -502,11 +589,13 @@
           <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 10px; margin-bottom: 12px;">
             <div>
               <label>เลือก Map / Seed:</label>
-              <select id="adjMapSelect" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;"></select>
+              <select id="adjMapSelect" required
+                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;"></select>
             </div>
             <div>
               <label>รอบ (Round):</label>
-              <select id="adjRoundSelect" required style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;">
+              <select id="adjRoundSelect" required
+                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;">
                 <option value="1">Round 1</option>
                 <option value="2">Round 2</option>
                 <option value="3">Round 3</option>
@@ -516,7 +605,9 @@
             </div>
             <div>
               <label>ประเภทกฎ (Rule Type):</label>
-              <select id="adjRuleType" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;" onchange="updateRuleInputsVisibility()">
+              <select id="adjRuleType"
+                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: inherit;"
+                onchange="updateRuleInputsVisibility()">
                 <option value="threshold_to_max">🎯 คะแนน &ge; เกณฑ์ ปรับเป็น 5,000</option>
                 <option value="void_round">⚠️ ให้ 5,000 ทุกคน (Void Round)</option>
                 <option value="bonus_points">➕ บวกแต้มชดเชยพิเศษ (+Bonus)</option>
@@ -527,11 +618,13 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; margin-bottom: 12px;">
             <div id="adjMinScoreContainer">
               <label>คะแนนขั้นต่ำ (Min Score):</label>
-              <input type="number" id="adjMinScore" min="0" max="5000" value="4990" required style="width: 100%; padding: 8px;">
+              <input type="number" id="adjMinScore" min="0" max="5000" value="4990" required
+                style="width: 100%; padding: 8px;">
             </div>
             <div id="adjTargetScoreContainer">
               <label>คะแนนเป้าหมาย (Target Score):</label>
-              <input type="number" id="adjTargetScore" min="0" max="5000" value="5000" required style="width: 100%; padding: 8px;">
+              <input type="number" id="adjTargetScore" min="0" max="5000" value="5000" required
+                style="width: 100%; padding: 8px;">
             </div>
             <div id="adjBonusContainer" style="display: none;">
               <label>แต้มบวกชดเชย (+Points):</label>
@@ -539,7 +632,8 @@
             </div>
             <div>
               <label>เหตุผล / บันทึก (Note):</label>
-              <input type="text" id="adjNote" placeholder="เช่น หมุดเฉลยคลาดเคลื่อน 25 เมตร" style="width: 100%; padding: 8px;">
+              <input type="text" id="adjNote" placeholder="เช่น หมุดเฉลยคลาดเคลื่อน 25 เมตร"
+                style="width: 100%; padding: 8px;">
             </div>
           </div>
 
@@ -565,7 +659,9 @@
             </tr>
           </thead>
           <tbody id="adjListTableBody">
-            <tr><td colspan="5" style="padding: 20px; text-align: center; color: #64748b;">กำลังโหลดกฎ...</td></tr>
+            <tr>
+              <td colspan="5" style="padding: 20px; text-align: center; color: #64748b;">กำลังโหลดกฎ...</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -579,7 +675,8 @@
   <!-- 7. Modal รายชื่อผู้เล่นทั้งหมด & สถิติ (Player Directory) -->
   <div id="playerDirectoryModal" class="modal-backdrop">
     <div class="edit-modal-box" style="max-width: 920px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
           <h2 style="color: var(--navy-primary); font-size: 1.3rem;">👥 ผู้เล่นทั้งหมด & สถิติ (Player Directory)</h2>
           <p style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">
@@ -590,10 +687,13 @@
       </div>
 
       <!-- Search bar -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0;">
         <div style="display: flex; gap: 8px; align-items: center; width: 60%;">
           <strong>🔍 ค้นหา:</strong>
-          <input type="text" id="playerDirSearchInput" placeholder="พิมพ์ชื่อผู้เล่น หรือ User ID..." style="padding: 6px 10px; font-size: 0.9rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 100%;" oninput="renderPlayerDirectoryList()">
+          <input type="text" id="playerDirSearchInput" placeholder="พิมพ์ชื่อผู้เล่น หรือ User ID..."
+            style="padding: 6px 10px; font-size: 0.9rem; border-radius: 4px; border: 1px solid #cbd5e1; width: 100%;"
+            oninput="renderPlayerDirectoryList()">
         </div>
         <div style="font-size: 0.85rem; color: #475569;">
           ผู้เล่นทั้งหมด: <strong id="playerDirTotalCount">0</strong> คน
@@ -629,34 +729,42 @@
   <!-- 8. Modal สถิติเจาะลึกผู้เล่นสำหรับแอดมิน (Admin Player Profile - All Weeks) -->
   <div id="adminPlayerModal" class="modal-backdrop" style="z-index: 2200;">
     <div class="edit-modal-box" style="max-width: 860px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <h2 id="admProfUsername" style="color: var(--navy-primary); font-size: 1.35rem; font-weight: 800;">Player Profile</h2>
-            <a id="admProfGeoguessrLink" href="#" target="_blank" rel="noopener noreferrer" class="btn" style="background: #00247d; font-size: 0.75rem; padding: 3px 8px;">
+            <h2 id="admProfUsername" style="color: var(--navy-primary); font-size: 1.35rem; font-weight: 800;">Player
+              Profile</h2>
+            <a id="admProfGeoguessrLink" href="#" target="_blank" rel="noopener noreferrer" class="btn"
+              style="background: #00247d; font-size: 0.75rem; padding: 3px 8px;">
               🔗 GeoGuessr Profile
             </a>
           </div>
-          <div id="admProfIdSub" style="font-size: 0.75rem; color: #64748b; font-family: monospace; margin-top: 2px;">ID: -</div>
+          <div id="admProfIdSub" style="font-size: 0.75rem; color: #64748b; font-family: monospace; margin-top: 2px;">
+            ID: -</div>
         </div>
         <button class="modal-close" onclick="closeAdminPlayerModal()">&times;</button>
       </div>
 
       <!-- Stat Highlights Cards -->
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;">
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
+        <div
+          style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #64748b; font-weight: bold;">WEEKS PLAYED</div>
           <div id="admProfWeeksPlayed" style="font-size: 1.25rem; font-weight: 800; color: #00247d;">-</div>
         </div>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
+        <div
+          style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #64748b; font-weight: bold;">TOTAL MAPS</div>
           <div id="admProfTotalMaps" style="font-size: 1.25rem; font-weight: 800; color: #00247d;">-</div>
         </div>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
+        <div
+          style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #16a34a; font-weight: bold;">5,000 ROUNDS</div>
           <div id="admProf5kRounds" style="font-size: 1.25rem; font-weight: 800; color: #16a34a;">-</div>
         </div>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
+        <div
+          style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #b45309; font-weight: bold;">25,000 PERFECTS</div>
           <div id="admProf25kGames" style="font-size: 1.25rem; font-weight: 800; color: #b45309;">-</div>
         </div>
@@ -693,7 +801,83 @@
     </div>
   </div>
 
+  <!-- 9. Modal ตรวจสอบการคิดคะแนนแต่ละเกม (Map & Round Calculation Inspector) -->
+  <div id="mapInspectorModal" class="modal-backdrop">
+    <div class="edit-modal-box" style="max-width: 980px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 14px;">
+        <div>
+          <h2 id="inspectorModalTitle" style="color: var(--navy-primary); font-size: 1.3rem;">🧮
+            ตรวจสอบการคิดคะแนนแต่ละเกม</h2>
+          <p id="inspectorModalSubtitle" style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">สัปดาห์: -</p>
+        </div>
+        <button class="modal-close" onclick="closeMapInspectorModal()">&times;</button>
+      </div>
+
+      <!-- Map Selector Pills -->
+      <div style="margin-bottom: 12px;">
+        <label
+          style="font-size: 0.8rem; font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">เลือกแมพ
+          (Select Map):</label>
+        <div id="inspectorMapPills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+      </div>
+
+      <!-- View Selector (Map Summary vs Round Deep-Dive) -->
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; gap: 6px;">
+          <button id="inspBtnMapSummary" class="btn"
+            style="background: var(--navy-primary); font-size: 0.82rem; padding: 6px 12px;"
+            onclick="setInspectorSubView('map')">
+            📊 ภาพรวมทั้งแมพ (Map Leaderboard)
+          </button>
+          <button id="inspBtnRoundDeep" class="btn"
+            style="background: #e2e8f0; color: #334155; font-size: 0.82rem; padding: 6px 12px;"
+            onclick="setInspectorSubView('round')">
+            🔍 เจาะลึกรายรอบ (Round Deep-Dive)
+          </button>
+        </div>
+
+        <!-- Round Selector Pills (Only visible when view is 'round') -->
+        <div id="inspectorRoundPillsContainer" style="display: none; align-items: center; gap: 4px;">
+          <span style="font-size: 0.8rem; font-weight: bold; color: #64748b; margin-right: 4px;">เลือกรอบ:</span>
+          <button class="btn insp-rnd-btn" data-rnd="0" onclick="selectInspectorRound(0)"
+            style="padding: 4px 8px; font-size: 0.78rem;">R1</button>
+          <button class="btn insp-rnd-btn" data-rnd="1" onclick="selectInspectorRound(1)"
+            style="padding: 4px 8px; font-size: 0.78rem;">R2</button>
+          <button class="btn insp-rnd-btn" data-rnd="2" onclick="selectInspectorRound(2)"
+            style="padding: 4px 8px; font-size: 0.78rem;">R3</button>
+          <button class="btn insp-rnd-btn" data-rnd="3" onclick="selectInspectorRound(3)"
+            style="padding: 4px 8px; font-size: 0.78rem;">R4</button>
+          <button class="btn insp-rnd-btn" data-rnd="4" onclick="selectInspectorRound(4)"
+            style="padding: 4px 8px; font-size: 0.78rem;">R5</button>
+          <button class="btn insp-rnd-btn" data-rnd="5" onclick="selectInspectorRound(5)"
+            style="padding: 4px 8px; font-size: 0.78rem;">Total (R6)</button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div id="inspectorTableContainer"
+        style="max-height: 480px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <table class="rules-table" style="margin: 0; font-size: 0.85rem; width: 100%; border-collapse: collapse;">
+          <thead id="inspectorTableHead"></thead>
+          <tbody id="inspectorTableBody"></tbody>
+        </table>
+      </div>
+
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 8px;">
+        <div id="inspectorFooterNote" style="font-size: 0.8rem; color: #64748b;">
+          * คำนวณด้วยระบบ Head-to-Head Pairwise (Half-Tie: ชนะ 1 แต้ม, เสมอ 0.5 แต้ม, แพ้ 0 แต้ม) ปัดเศษ Map Points
+          สุทธิ
+        </div>
+        <button class="btn" style="background: #64748b;" onclick="closeMapInspectorModal()">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script src="admin.js"></script>
 </body>
+
 </html>

@@ -162,6 +162,7 @@ async function loadWeeks() {
                   : `<button class="btn btn-freeze" onclick="toggleFreeze(${w.id}, true)">❄️ Freeze ทันที</button>`
               }
               <button class="btn" style="background: #0284c7; color: white;" onclick="openScoresModal(${w.id}, '${escapeHtml(w.title)}')">📊 จัดการคะแนน</button>
+              <button class="btn" style="background: #0d9488; color: white;" onclick="openMapInspectorModal(${w.id}, '${escapeHtml(w.title)}')">🧮 ตรวจการคิดคะแนน</button>
               <button class="btn" style="background: #7c3aed; color: white;" onclick="openAdjustmentsModal(${w.id}, '${escapeHtml(w.title)}')">🛠️ กฎคะแนนพิเศษ</button>
               <button class="btn btn-edit" onclick="openEditModal(${w.id})">✏️ แก้ไขข้อมูล & 7 Maps</button>
               ${
@@ -1371,5 +1372,342 @@ window.addEventListener("keydown", (e) => {
     document.querySelectorAll(".modal-backdrop.open").forEach((m) => m.classList.remove("open"));
   }
 });
+
+// ==========================================
+// 8. ตรวจสอบการคิดคะแนนแต่ละเกม (Map & Round Calculation Inspector)
+// ==========================================
+let inspWeekId = null;
+let inspWeekChallenges = [];
+let inspWeekScores = [];
+let inspCalculatedMaps = new Map();
+let inspSelectedSeed = 1;
+let inspCurrentSubView = "map"; // "map" | "round"
+let inspSelectedRound = 0; // 0..4 = R1..R5, 5 = Total 25k (R6)
+
+function getRankClass(rank) {
+  if (rank === 1) return "rank-gold";
+  if (rank === 2) return "rank-silver";
+  if (rank === 3) return "rank-bronze";
+  return "";
+}
+
+window.openMapInspectorModal = async function (weekId, weekTitle) {
+  if (!adminDb) return;
+  inspWeekId = weekId;
+  const modal = document.getElementById("mapInspectorModal");
+  document.getElementById("inspectorModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
+  document.getElementById("inspectorTableBody").innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">กำลังโหลดและคำนวณคะแนนของสัปดาห์นี้...</td></tr>`;
+
+  modal.classList.add("open");
+  await loadAndComputeInspectorData(weekId);
+};
+
+window.openInspectorFromScoresModal = function () {
+  if (!currentScoresWeekId) return;
+  const subtitle = document.getElementById("scoresModalSubtitle").textContent.replace("สัปดาห์: ", "").trim();
+  openMapInspectorModal(currentScoresWeekId, subtitle);
+};
+
+window.closeMapInspectorModal = function () {
+  document.getElementById("mapInspectorModal")?.classList.remove("open");
+};
+
+async function loadAndComputeInspectorData(weekId) {
+  try {
+    const { data: challenges, error: chErr } = await adminDb
+      .from("challenges")
+      .select("*")
+      .eq("week_id", weekId)
+      .order("seed_number", { ascending: true });
+
+    if (chErr) throw chErr;
+    inspWeekChallenges = challenges || [];
+
+    const chIds = inspWeekChallenges.map((c) => c.id);
+    const { data: scores, error: scErr } = await adminDb
+      .from("scores")
+      .select("*, players(id, username)")
+      .in("challenge_id", chIds);
+
+    if (scErr) throw scErr;
+    inspWeekScores = scores || [];
+
+    computeInspectorCalculations();
+    inspSelectedSeed = inspWeekChallenges[0]?.seed_number || 1;
+    inspCurrentSubView = "map";
+    inspSelectedRound = 0;
+
+    renderMapInspector();
+  } catch (err) {
+    console.error("Load inspector data error:", err);
+    document.getElementById("inspectorTableBody").innerHTML = `<tr><td colspan="10" style="padding: 24px; text-align: center; color: red;">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function computeInspectorCalculations() {
+  inspCalculatedMaps.clear();
+
+  inspWeekChallenges.forEach((c) => {
+    const rawScores = inspWeekScores.filter((s) => s.challenge_id === c.id);
+    const pList = rawScores.map((s) => ({
+      scoreId: s.id,
+      playerId: s.player_id,
+      username: s.players?.username || `Player #${s.player_id}`,
+      raw: [
+        s.r1 || 0,
+        s.r2 || 0,
+        s.r3 || 0,
+        s.r4 || 0,
+        s.r5 || 0,
+        s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0))
+      ],
+      phantoms: [],
+      points: [],
+      h2h: []
+    }));
+
+    if (pList.length > 0) {
+      for (let m = 0; m < 6; m++) {
+        const maxScore = m < 5 ? 5000 : 25000;
+
+        pList.forEach((p) => {
+          const raw = p.raw[m];
+          const missing = Math.max(0, maxScore - raw);
+          const phantom = raw + 0.1 * missing;
+          p.phantoms[m] = phantom;
+        });
+
+        // Pairwise Head-to-Head Half-Tie
+        pList.forEach((p, i) => {
+          let pts = 0;
+          let wins = 0;
+          let ties = 0;
+          let losses = 0;
+          const pRaw = p.raw[m];
+          const pPhan = p.phantoms[m];
+
+          pList.forEach((opp, j) => {
+            if (i === j) return;
+            const oppRaw = opp.raw[m];
+            const oppPhan = opp.phantoms[m];
+
+            if (pRaw > oppPhan && oppRaw <= pPhan) {
+              pts += 1;
+              wins += 1;
+            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
+              pts += 0.5;
+              ties += 1;
+            } else {
+              losses += 1;
+            }
+          });
+
+          p.points[m] = pts;
+          p.h2h[m] = { wins, ties, losses };
+        });
+      }
+
+      // Map Points = sum of 6 rounds, rounded with Math.round
+      pList.forEach((p) => {
+        p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
+        p.ptsMap = Math.round(p.ptsRounds);
+      });
+
+      // Sort by ptsMap desc, tiebreaker raw total
+      pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+
+      pList.forEach((p, idx) => {
+        const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
+        p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
+      });
+    }
+
+    inspCalculatedMaps.set(c.id, pList);
+  });
+}
+
+window.selectInspectorMap = function (seedNum) {
+  inspSelectedSeed = seedNum;
+  renderMapInspector();
+};
+
+window.setInspectorSubView = function (subView) {
+  inspCurrentSubView = subView;
+  renderMapInspector();
+};
+
+window.selectInspectorRound = function (rndIdx) {
+  inspSelectedRound = rndIdx;
+  renderMapInspector();
+};
+
+function renderMapInspector() {
+  const pillsContainer = document.getElementById("inspectorMapPills");
+  pillsContainer.innerHTML = inspWeekChallenges
+    .map((c) => {
+      const isSel = c.seed_number === inspSelectedSeed;
+      const bgStyle = isSel
+        ? "background: #0284c7; color: white; border-color: #0284c7;"
+        : "background: white; color: #475569; border: 1px solid #cbd5e1;";
+      return `
+        <button class="btn" style="${bgStyle} font-size: 0.8rem; padding: 5px 12px; border-radius: 20px;" onclick="selectInspectorMap(${c.seed_number})">
+          🗺️ Map ${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}
+        </button>
+      `;
+    })
+    .join("");
+
+  const activeChallenge = inspWeekChallenges.find((c) => c.seed_number === inspSelectedSeed) || inspWeekChallenges[0];
+  if (!activeChallenge) return;
+
+  const pList = inspCalculatedMaps.get(activeChallenge.id) || [];
+  const thead = document.getElementById("inspectorTableHead");
+  const tbody = document.getElementById("inspectorTableBody");
+
+  const btnMap = document.getElementById("inspBtnMapSummary");
+  const btnRound = document.getElementById("inspBtnRoundDeep");
+  const roundPillsContainer = document.getElementById("inspectorRoundPillsContainer");
+
+  if (inspCurrentSubView === "map") {
+    btnMap.style.background = "var(--navy-primary)";
+    btnMap.style.color = "white";
+    btnRound.style.background = "#e2e8f0";
+    btnRound.style.color = "#334155";
+    roundPillsContainer.style.display = "none";
+
+    thead.innerHTML = `
+      <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+        <th style="width: 55px; text-align: center; padding: 8px;">อันดับ</th>
+        <th style="text-align: left; padding: 8px 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
+        <th style="width: 75px; text-align: center;">R1</th>
+        <th style="width: 75px; text-align: center;">R2</th>
+        <th style="width: 75px; text-align: center;">R3</th>
+        <th style="width: 75px; text-align: center;">R4</th>
+        <th style="width: 75px; text-align: center;">R5</th>
+        <th style="width: 95px; text-align: center; background: #eff6ff; color: #1e3a8a;">Total 25k</th>
+        <th style="width: 90px; text-align: center; background: #00247d; color: white;">Map Points</th>
+      </tr>
+    `;
+
+    if (pList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = pList
+      .map((p) => {
+        const rankCls = getRankClass(p.mapRank);
+        const roundCells = [0, 1, 2, 3, 4]
+          .map(
+            (rIdx) => `
+            <td style="text-align: center; padding: 6px 4px; border-bottom: 1px solid #e2e8f0;">
+              <div style="font-weight: 600; color: #334155;">${p.raw[rIdx].toLocaleString()}</div>
+              <div style="font-size: 0.73rem; color: #16a34a; font-weight: 700;">+${p.points[rIdx]} pts</div>
+            </td>
+          `
+          )
+          .join("");
+
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td class="col-pos ${rankCls}" style="text-align: center;">${p.mapRank}</td>
+            <td style="padding: 6px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
+            ${roundCells}
+            <td style="text-align: center; padding: 6px 4px; background: #eff6ff;">
+              <div style="font-weight: 700; color: #1e3a8a;">${p.raw[5].toLocaleString()}</div>
+              <div style="font-size: 0.73rem; color: #1e3a8a; font-weight: 700;">+${p.points[5]} pts</div>
+            </td>
+            <td style="text-align: center; font-size: 1.05rem; font-weight: 800; color: #00247d; background: #f8fafc;">
+              ${p.ptsMap}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  } else {
+    // Round Deep Dive View
+    btnMap.style.background = "#e2e8f0";
+    btnMap.style.color = "#334155";
+    btnRound.style.background = "var(--navy-primary)";
+    btnRound.style.color = "white";
+    roundPillsContainer.style.display = "flex";
+
+    document.querySelectorAll(".insp-rnd-btn").forEach((btn) => {
+      const rnd = parseInt(btn.getAttribute("data-rnd"), 10);
+      if (rnd === inspSelectedRound) {
+        btn.style.background = "#0284c7";
+        btn.style.color = "white";
+      } else {
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#475569";
+      }
+    });
+
+    const m = inspSelectedRound;
+    const roundTitle = m < 5 ? `Round ${m + 1} (เต็ม 5,000 คะแนน)` : `Total Score (เต็ม 25,000 คะแนน)`;
+
+    thead.innerHTML = `
+      <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+        <th style="width: 55px; text-align: center; padding: 8px;">อันดับ</th>
+        <th style="text-align: left; padding: 8px 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
+        <th style="width: 100px; text-align: center;">คะแนนดิบ (Raw)</th>
+        <th style="width: 110px; text-align: center; background: #eff6ff; color: #1e3a8a;">Phantom (10%)</th>
+        <th style="text-align: left; padding: 8px 12px;">ผลการเจอกับคู่แข่งอีก ${pList.length - 1} คน (H2H)</th>
+        <th style="width: 100px; text-align: center; background: #00247d; color: white;">แต้มรอบนี้</th>
+      </tr>
+    `;
+
+    if (pList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      return;
+    }
+
+    const roundPlayers = [...pList].sort((a, b) => b.points[m] - a.points[m] || b.raw[m] - a.raw[m]);
+    roundPlayers.forEach((p, idx) => {
+      const isTie = idx > 0 && roundPlayers[idx - 1].points[m] === p.points[m];
+      p.roundRank = isTie ? roundPlayers[idx - 1].roundRank : idx + 1;
+    });
+
+    tbody.innerHTML = roundPlayers
+      .map((p) => {
+        const rankCls = getRankClass(p.roundRank);
+        const h = p.h2h[m] || { wins: 0, ties: 0, losses: 0 };
+        const phantomVal = p.phantoms[m] !== undefined ? p.phantoms[m].toFixed(1) : "-";
+
+        let outcomeBadge = `
+          <span style="display: inline-block; background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">
+            ชนะ ${h.wins}
+          </span>
+        `;
+        if (h.ties > 0) {
+          outcomeBadge += `
+            <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; margin-left: 4px;">
+              เสมอ ${h.ties}
+            </span>
+          `;
+        }
+        outcomeBadge += `
+          <span style="display: inline-block; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; margin-left: 4px;">
+            แพ้ ${h.losses}
+          </span>
+        `;
+
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td class="col-pos ${rankCls}" style="text-align: center;">${p.roundRank}</td>
+            <td style="padding: 8px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
+            <td style="text-align: center; font-weight: 700; color: #0f172a;">${p.raw[m].toLocaleString()}</td>
+            <td style="text-align: center; font-weight: 700; color: #1e3a8a; background: #f0f7ff;">${phantomVal}</td>
+            <td style="padding: 8px 12px;">${outcomeBadge}</td>
+            <td style="text-align: center; font-weight: 800; font-size: 1rem; color: #15803d; background: #f8fafc;">
+              +${p.points[m]} pts
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+}
+
 
 checkAuth();
