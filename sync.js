@@ -176,6 +176,44 @@ async function main() {
 
       if (results.length === 0) continue;
 
+      // ตรวจสอบกฎปรับแก้คะแนนพิเศษ (Score Adjustments) สำหรับ Challenge นี้
+      try {
+        const { data: adjustments } = await supabase
+          .from("score_adjustments")
+          .select("*")
+          .eq("challenge_id", challenge.id);
+
+        if (adjustments && adjustments.length > 0) {
+          for (const adj of adjustments) {
+            const rKey = `r${adj.round_number}`;
+            let adjustedCount = 0;
+            results.forEach((r) => {
+              let changed = false;
+              if (adj.rule_type === "threshold_to_max" && r[rKey] >= adj.min_score) {
+                r[rKey] = adj.target_score;
+                changed = true;
+              } else if (adj.rule_type === "void_round") {
+                r[rKey] = adj.target_score || 5000;
+                changed = true;
+              } else if (adj.rule_type === "bonus_points" && adj.bonus_points > 0) {
+                r[rKey] = Math.min(5000, r[rKey] + adj.bonus_points);
+                changed = true;
+              }
+
+              if (changed) {
+                adjustedCount++;
+                r.total = r.r1 + r.r2 + r.r3 + r.r4 + r.r5;
+              }
+            });
+            if (adjustedCount > 0) {
+              console.log(`     🎯 ใช้กฎปรับคะแนน Round ${adj.round_number} (${adj.rule_type}): อัปเดต ${adjustedCount} คน`);
+            }
+          }
+        }
+      } catch (adjErr) {
+        // ข้ามอย่างปลอดภัยหากยังไม่ได้สร้างตาราง score_adjustments
+      }
+
       // 1. บันทึก / อัปเดตข้อมูลผู้เล่นลงตาราง players
       const playerUpserts = results.map((r) => ({
         id: r.userId,
