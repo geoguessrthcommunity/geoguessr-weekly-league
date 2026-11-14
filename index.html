@@ -289,15 +289,17 @@
           </ul>
 
           <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🎯 การแปลงเป็นแต้มประจำรอบ
-            (Round Points):</h4>
+            (Round Points) ด้วยระบบ Head-to-Head (Half-Tie):</h4>
           <p>
-            ในแต่ละรอบ คะแนน Phantom Score ของคุณจะถูกนำไปเปรียบเทียบกับ <strong>คะแนนดิบ (Raw Scores)
-              ของผู้เล่นทุกคน</strong> ในแมพนั้น<br>
-            <strong>แต้มที่คุณได้รับในรอบนั้น = จำนวนผู้เล่นที่มีคะแนนดิบ &le; Phantom Score ของคุณ</strong>
-            (นับรวมคนที่คุณชนะ และคนที่เสมอกับคุณในระยะเกณฑ์ผ่อนปรน 10%)
+            ในแต่ละรอบ คะแนนของคุณจะถูกนำไปเปรียบเทียบตัวต่อตัวกับ <strong>คู่แข่งทุกคนในรอบนั้น (ไม่นับตัวเอง)</strong> โดยอ้างอิงจากเกณฑ์ผ่อนปรน Phantom Score (10%):
           </p>
+          <ul style="margin: 6px 0 10px 24px; line-height: 1.7; font-size: 0.93rem;">
+            <li><strong>ชนะขาด (ได้ 1 แต้ม):</strong> คะแนนดิบของเรา &gt; Phantom Score ของคู่แข่ง</li>
+            <li><strong>เสมอ (แบ่งคนละ 0.5 แต้ม):</strong> คะแนนดิบของทั้งสองคนตกอยู่ในระยะ Phantom ของกันและกัน (สูสีกันตามเกณฑ์ผ่อนปรน 10%)</li>
+            <li><strong>แพ้ (ได้ 0 แต้ม):</strong> คะแนนดิบของคู่แข่ง &gt; Phantom Score ของเรา</li>
+          </ul>
           <p style="margin-top: 8px;">
-            เมื่อเล่นครบทั้ง 6 รอบย่อย แต้มประจำรอบจะถูกนำมารวมกันเป็น <strong>Map Points</strong> ของแผนที่นั้น
+            เมื่อเล่นครบทั้ง 6 รอบย่อย แต้มประจำรอบจะถูกนำมารวมกันเป็น <strong>Map Points</strong> ของแผนที่นั้น (ปัดเศษเป็นจำนวนเต็มกลมๆ เช่น 75.5 &rarr; 76 โดยหากแต้มเท่ากันจะถือเป็นอันดับร่วม)
             และเมื่อรวม Map Points ทั้ง 7 แผนที่เข้าด้วยกัน จะได้เป็นคะแนนรวมประจำสัปดาห์ในตาราง Leaderboard!
           </p>
 
@@ -310,7 +312,7 @@
                   <th style="width: 130px;">ผู้เล่น (Player)</th>
                   <th style="width: 100px;">คะแนนดิบ (Raw)</th>
                   <th style="width: 120px; background: #eff6ff; color: #1e3a8a;">Phantom Score</th>
-                  <th style="text-align: left; padding-left: 14px;">คะแนนดิบที่ชนะหรือเสมอ (&le; Phantom)</th>
+                  <th style="text-align: left; padding-left: 14px;">ผลการเจอกับคู่แข่งอีก 9 คน (Head-to-Head)</th>
                   <th style="width: 90px; background: #00247d; color: white;">แต้มรอบนี้</th>
                 </tr>
               </thead>
@@ -319,16 +321,15 @@
                   <td><strong>🥇 ผู้เล่น A</strong></td>
                   <td><strong>5,000</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">5,000</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบทุกคน (10 คน)</td>
-                  <td style="font-weight: bold; color: #15803d;">10 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาดคู่แข่งทั้ง 9 คน (B ถึง J)</td>
+                  <td style="font-weight: bold; color: #15803d;">9 แต้ม</td>
                 </tr>
                 <tr>
                   <td><strong>🥈 ผู้เล่น B</strong></td>
                   <td><strong>4,980</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,982</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ B, C, D, E, F, G, H, I, J (9 คน) <em>(แพ้ A
-                      5,000)</em></td>
-                  <td style="font-weight: bold; color: #15803d;">9 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 8 คน (C ถึง J) <em>(แพ้ A)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">8 แต้ม</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 ผู้เล่น C</strong> <span
@@ -336,8 +337,8 @@
                       (3 คน)</span></td>
                   <td><strong>4,950</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,955</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ C, D, E, F, G, H, I, J (8 คน)</td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 5 คน (F ถึง J) + เสมอ D, E (2 คน &times; 0.5)</td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 แต้ม</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 ผู้เล่น D</strong> <span
@@ -345,9 +346,8 @@
                       (3 คน)</span></td>
                   <td><strong>4,948</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,953.2</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ C, D, E, F, G, H, I, J (8 คน) <em>(Phantom
-                      4,953.2 &ge; ดิบ C 4,950)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 5 คน (F ถึง J) + เสมอ C, E (2 คน &times; 0.5) <em>(Phantom &ge; C)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 แต้ม</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 ผู้เล่น E</strong> <span
@@ -355,17 +355,15 @@
                       (3 คน)</span></td>
                   <td><strong>4,945</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,950.5</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ C, D, E, F, G, H, I, J (8 คน) <em>(Phantom
-                      4,950.5 &ge; ดิบ C 4,950)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 5 คน (F ถึง J) + เสมอ C, D (2 คน &times; 0.5) <em>(Phantom &ge; C)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 แต้ม</td>
                 </tr>
                 <tr>
                   <td><strong>ผู้เล่น F</strong></td>
                   <td><strong>4,750</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,775</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ F, G, H, I, J (5 คน) <em>(แพ้ดิบ C, D, E
-                      4,945+)</em></td>
-                  <td style="font-weight: bold; color: #15803d;">5 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 4 คน (G, H, I, J) <em>(แพ้ A ถึง E)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">4 แต้ม</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>ผู้เล่น G</strong> <span
@@ -373,8 +371,8 @@
                   </td>
                   <td><strong>4,200</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,280</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ G, H, I, J (4 คน)</td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">4 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 2 คน (I, J) + เสมอ H (1 คน &times; 0.5)</td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">2.5 แต้ม</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>ผู้เล่น H</strong> <span
@@ -382,23 +380,22 @@
                   </td>
                   <td><strong>4,185</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,266.5</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ G, H, I, J (4 คน) <em>(Phantom 4,266.5 &ge;
-                      ดิบ G 4,200)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">4 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 2 คน (I, J) + เสมอ G (1 คน &times; 0.5) <em>(Phantom &ge; G)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">2.5 แต้ม</td>
                 </tr>
                 <tr>
                   <td><strong>ผู้เล่น I</strong></td>
                   <td><strong>3,600</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">3,740</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ I, J (2 คน)</td>
-                  <td style="font-weight: bold; color: #15803d;">2 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ชนะขาด 1 คน (J) <em>(แพ้ A ถึง H)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">1 แต้ม</td>
                 </tr>
                 <tr>
                   <td><strong>ผู้เล่น J</strong></td>
                   <td><strong>2,500</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">2,750</td>
-                  <td style="text-align: left; padding-left: 14px;">ชนะดิบ J (1 คน)</td>
-                  <td style="font-weight: bold; color: #15803d;">1 แต้ม</td>
+                  <td style="text-align: left; padding-left: 14px;">ไม่ชนะและไม่เสมอใครเลย (แพ้คู่แข่งทั้ง 9 คน)</td>
+                  <td style="font-weight: bold; color: #64748b;">0 แต้ม</td>
                 </tr>
               </tbody>
             </table>
@@ -627,16 +624,18 @@
                 = 20,500</em>).</li>
           </ul>
 
-          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🎯 Round Points Calculation:
+          <h4 style="color: var(--navy-primary); margin: 16px 0 6px 0; font-size: 1rem;">🎯 Round Points Calculation: Head-to-Head (Half-Tie System)
           </h4>
           <p>
-            In every round, your Phantom Score is compared against the <strong>Raw Scores of all players</strong> in
-            that map.<br>
-            <strong>Points earned in that round = Number of players whose raw score is &le; your Phantom Score</strong>
-            (all players you beat plus players within your 10% phantom tie window).
+            In every round, your performance is evaluated in pairwise head-to-head match-ups against <strong>all other opponents (excluding yourself)</strong> using the 10% Phantom Score threshold:
           </p>
+          <ul style="margin: 6px 0 10px 24px; line-height: 1.7; font-size: 0.93rem;">
+            <li><strong>Win (1.0 pt):</strong> Your Raw Score &gt; Opponent's Phantom Score.</li>
+            <li><strong>Tie (0.5 pt each):</strong> Both players fall mutually within each other's 10% Phantom threshold.</li>
+            <li><strong>Loss (0.0 pt):</strong> Opponent's Raw Score &gt; Your Phantom Score.</li>
+          </ul>
           <p style="margin-top: 8px;">
-            Your points across all 6 rounds are summed into your <strong>Map Points</strong>. Finally, summing Map
+            Your points across all 6 rounds are summed into your <strong>Map Points</strong> (rounded to clean integers, e.g., 75.5 &rarr; 76, with equal points sharing the same rank). Finally, summing Map
             Points across all 7 maps gives your overall score on the weekly master leaderboard!
           </p>
 
@@ -649,7 +648,7 @@
                   <th style="width: 130px;">Player</th>
                   <th style="width: 100px;">Raw Score</th>
                   <th style="width: 120px; background: #eff6ff; color: #1e3a8a;">Phantom Score</th>
-                  <th style="text-align: left; padding-left: 14px;">Raw Scores Beaten or Tied (&le; Phantom)</th>
+                  <th style="text-align: left; padding-left: 14px;">Head-to-Head vs 9 Opponents</th>
                   <th style="width: 90px; background: #00247d; color: white;">Round Pts</th>
                 </tr>
               </thead>
@@ -658,16 +657,15 @@
                   <td><strong>🥇 Player A</strong></td>
                   <td><strong>5,000</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">5,000</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats all players (10 players)</td>
-                  <td style="font-weight: bold; color: #15803d;">10 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats all 9 opponents (B through J)</td>
+                  <td style="font-weight: bold; color: #15803d;">9 pts</td>
                 </tr>
                 <tr>
                   <td><strong>🥈 Player B</strong></td>
                   <td><strong>4,980</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,982</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw B, C, D, E, F, G, H, I, J (9 players)
-                    <em>(Raw A 5,000 is higher)</em></td>
-                  <td style="font-weight: bold; color: #15803d;">9 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 8 opponents (C through J) <em>(Loss vs A)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">8 pts</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 Player C</strong> <span
@@ -675,8 +673,8 @@
                       (3-way)</span></td>
                   <td><strong>4,950</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,955</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw C, D, E, F, G, H, I, J (8 players)</td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 5 (F to J) + Ties D, E (2 &times; 0.5)</td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 pts</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 Player D</strong> <span
@@ -684,9 +682,8 @@
                       (3-way)</span></td>
                   <td><strong>4,948</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,953.2</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw C, D, E, F, G, H, I, J (8 players)
-                    <em>(Phantom 4,953.2 &ge; Raw C 4,950)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 5 (F to J) + Ties C, E (2 &times; 0.5) <em>(Phantom &ge; C)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 pts</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>🥉 Player E</strong> <span
@@ -694,17 +691,15 @@
                       (3-way)</span></td>
                   <td><strong>4,945</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,950.5</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw C, D, E, F, G, H, I, J (8 players)
-                    <em>(Phantom 4,950.5 &ge; Raw C 4,950)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">8 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 5 (F to J) + Ties C, D (2 &times; 0.5) <em>(Phantom &ge; C)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">6 pts</td>
                 </tr>
                 <tr>
                   <td><strong>Player F</strong></td>
                   <td><strong>4,750</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,775</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw F, G, H, I, J (5 players) <em>(Raw C, D, E
-                      are higher)</em></td>
-                  <td style="font-weight: bold; color: #15803d;">5 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 4 (G, H, I, J) <em>(Losses vs A to E)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">4 pts</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>Player G</strong> <span
@@ -712,8 +707,8 @@
                   </td>
                   <td><strong>4,200</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,280</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw G, H, I, J (4 players)</td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">4 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 2 (I, J) + Ties H (1 &times; 0.5)</td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">2.5 pts</td>
                 </tr>
                 <tr style="background: #fffbeb;">
                   <td><strong>Player H</strong> <span
@@ -721,23 +716,22 @@
                   </td>
                   <td><strong>4,185</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">4,266.5</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw G, H, I, J (4 players) <em>(Phantom
-                      4,266.5 &ge; Raw G 4,200)</em></td>
-                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">4 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 2 (I, J) + Ties G (1 &times; 0.5) <em>(Phantom &ge; G)</em></td>
+                  <td style="font-weight: bold; color: #b45309; font-size: 1rem;">2.5 pts</td>
                 </tr>
                 <tr>
                   <td><strong>Player I</strong></td>
                   <td><strong>3,600</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">3,740</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw I, J (2 players)</td>
-                  <td style="font-weight: bold; color: #15803d;">2 pts</td>
+                  <td style="text-align: left; padding-left: 14px;">Defeats 1 (J) <em>(Losses vs A to H)</em></td>
+                  <td style="font-weight: bold; color: #15803d;">1 pt</td>
                 </tr>
                 <tr>
                   <td><strong>Player J</strong></td>
                   <td><strong>2,500</strong></td>
                   <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">2,750</td>
-                  <td style="text-align: left; padding-left: 14px;">Beats Raw J (1 player)</td>
-                  <td style="font-weight: bold; color: #15803d;">1 pt</td>
+                  <td style="text-align: left; padding-left: 14px;">0 Wins, 0 Ties (Losses vs all 9 opponents)</td>
+                  <td style="font-weight: bold; color: #64748b;">0 pts</td>
                 </tr>
               </tbody>
             </table>

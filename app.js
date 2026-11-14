@@ -48,10 +48,14 @@ const formatNum = (num) => (num !== undefined && num !== null ? Number(num).toLo
 function formatRankDisplay(rank, total) {
   if (rank === undefined || rank === null || rank === "-") return "-";
   const suffix = total ? `<span style="font-size: 0.75em; color: #64748b; font-weight: 500;">/${total}</span>` : "";
-  if (rank === 1) return `🥇 1${suffix}`;
-  if (rank === 2) return `🥈 2${suffix}`;
-  if (rank === 3) return `🥉 3${suffix}`;
   return `${rank}${suffix}`;
+}
+
+function getRankClass(rank) {
+  if (rank === 1) return "rank-gold";
+  if (rank === 2) return "rank-silver";
+  if (rank === 3) return "rank-bronze";
+  return "";
 }
 
 /**
@@ -445,7 +449,6 @@ function computeWeekStandings(challenges, scores) {
       // 1. Calculate Phantom Score for each of 6 rounds (0..4 = R1..R5 / 5 = Total)
       for (let m = 0; m < 6; m++) {
         const maxScore = m < 5 ? 5000 : 25000;
-        const colRawScores = pList.map((p) => p.raw[m]);
 
         pList.forEach((p) => {
           p.points = p.points || [];
@@ -456,15 +459,36 @@ function computeWeekStandings(challenges, scores) {
           const phantom = raw + 0.1 * missing;
 
           p.phantoms[m] = phantom;
-          const ptsInRound = colRawScores.filter((s) => s <= phantom).length;
+        });
+
+        // 1.1 Pairwise Head-to-Head Scoring with Half-Tie (vs all opponents)
+        pList.forEach((p, i) => {
+          let ptsInRound = 0;
+          const pRaw = p.raw[m];
+          const pPhan = p.phantoms[m];
+
+          pList.forEach((opp, j) => {
+            if (i === j) return; // Do not count self
+            const oppRaw = opp.raw[m];
+            const oppPhan = opp.phantoms[m];
+
+            if (pRaw > oppPhan && oppRaw <= pPhan) {
+              // Win: strictly beats opponent's phantom
+              ptsInRound += 1;
+            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
+              // Tie: mutually fall within each other's phantom threshold
+              ptsInRound += 0.5;
+            }
+          });
+
           p.points[m] = ptsInRound;
         });
       }
 
-      // 2. Map Points = direct sum of points earned in all 6 rounds
+      // 2. Map Points = direct sum of points earned in all 6 rounds (rounded to integer)
       pList.forEach((p) => {
         p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
-        p.ptsMap = p.ptsRounds;
+        p.ptsMap = Math.round(p.ptsRounds);
       });
 
       // 3. Rank in map (ptsMap descending, raw total as tie breaker)
@@ -546,6 +570,7 @@ function calculateAndRenderScores(scores, challenges) {
   scoresTableBody.innerHTML = leaderboard
     .map((p) => {
       const posDisplay = formatRankDisplay(p.overallRank);
+      const posClass = `col-pos ${getRankClass(p.overallRank)}`.trim();
 
       // Count played maps out of total challenges
       const playedMapsCount = challenges.filter((c) => p.maps[c.id]).length;
@@ -564,17 +589,18 @@ function calculateAndRenderScores(scores, challenges) {
           }
 
           const rankDisplay = formatRankDisplay(mData.rank);
+          const mapRankClass = `col-rank ${getRankClass(mData.rank)}`.trim();
 
           return `
             <td class="col-pts">${formatNum(mData.ptsMap)}</td>
-            <td class="col-rank">${rankDisplay}</td>
+            <td class="${mapRankClass}">${rankDisplay}</td>
           `;
         })
         .join("");
 
       return `
         <tr>
-          <td class="col-pos">${posDisplay}</td>
+          <td class="${posClass}">${posDisplay}</td>
           <td class="col-player" title="${escapeHtml(p.username)}">
             <span class="player-name">${escapeHtml(p.username)}</span>${playedBadge}
           </td>
@@ -622,6 +648,7 @@ function renderRawScoresView() {
   rawTableBody.innerHTML = playersList
     .map((p) => {
       const rankDisplay = formatRankDisplay(p.rank);
+      const posClass = `col-pos ${getRankClass(p.rank)}`.trim();
 
       const roundCells = [0, 1, 2, 3, 4]
         .map((rIdx) => {
@@ -647,7 +674,7 @@ function renderRawScoresView() {
 
       return `
         <tr>
-          <td class="col-pos">${rankDisplay}</td>
+          <td class="${posClass}">${rankDisplay}</td>
           <td class="col-player">
             <span class="player-name">${escapeHtml(p.username)}</span>
           </td>
@@ -811,6 +838,7 @@ async function loadAndRenderSeasonStandings() {
     seasonTableBody.innerHTML = finalSeasonList
       .map((p) => {
         const posDisplay = formatRankDisplay(p.seasonRank);
+        const posClass = `col-pos ${getRankClass(p.seasonRank)}`.trim();
 
         const weekCols = frozenWeeks
           .map((w) => {
@@ -829,7 +857,7 @@ async function loadAndRenderSeasonStandings() {
 
         return `
           <tr>
-            <td class="col-pos">${posDisplay}</td>
+            <td class="${posClass}">${posDisplay}</td>
             <td class="col-player">
               <a class="player-link" onclick="openPlayerProfile('${p.userId}')" title="Click to view profile">${escapeHtml(p.username)}</a>
             </td>
@@ -954,9 +982,11 @@ window.openPlayerProfile = async function (userId) {
         const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(ch.week_id);
         const mapRes = wkStandings?.mapResults?.get(ch.id)?.get(userId);
 
+        let rankCls = "";
         if (mapRes) {
           ptsMapDisplay = formatNum(mapRes.ptsMap);
           rankMapDisplay = formatRankDisplay(mapRes.rank, mapRes.totalPlayers);
+          rankCls = getRankClass(mapRes.rank);
         }
 
         return `
@@ -973,7 +1003,7 @@ window.openPlayerProfile = async function (userId) {
             <td>${formatNum(s.r5)}</td>
             <td style="background: #eff6ff; font-weight: 700; color: #1e3a8a;">${formatNum(total)}</td>
             <td style="background: #00247d; color: white; font-weight: 700;">${ptsMapDisplay}</td>
-            <td>${rankMapDisplay}</td>
+            <td class="${rankCls}">${rankMapDisplay}</td>
           </tr>
         `;
       })
