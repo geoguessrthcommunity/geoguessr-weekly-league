@@ -564,6 +564,12 @@ async function main() {
 
     console.log(`🔍 พบทั้งหมด ${challenges.length} seeds สำหรับ ${week.title}`);
 
+    // เตรียมตัวแปรรวบรวมข้อมูลทั้ง 7 Seeds เพื่อ Batch Upsert ตูมเดียว
+    // ป้องกันไม่ให้หน้าเว็บที่ต่อ Realtime รีเฟรชกระพริบซ้ำๆ 7 รอบ
+    const allPlayerUpsertsMap = new Map();
+    const allScoreUpserts = [];
+    const pendingNotifications = [];
+
     for (const challenge of challenges) {
       console.log(`  -> กำลังดึง Seed ${challenge.seed_number} (Token: ${challenge.token})...`);
       const results = await fetchChallengeResults(challenge.token);
@@ -614,10 +620,18 @@ async function main() {
       // ดึงคะแนนเดิมที่มีในฐานข้อมูลเพื่อเปรียบเทียบหาคะแนนใหม่ / มีการอัปเดต
       let existingScores = [];
       try {
-        const { data: exScores } = await supabase
+        let { data: exScores, error: exErr } = await supabase
           .from("scores")
           .select("player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time")
           .eq("challenge_id", challenge.id);
+
+        if (exErr && (exErr.message?.includes("played_at") || exErr.code === "PGRST204")) {
+          const fallback = await supabase
+            .from("scores")
+            .select("player_id, total_score, r1, r2, r3, r4, r5")
+            .eq("challenge_id", challenge.id);
+          exScores = fallback.data;
+        }
         existingScores = exScores || [];
       } catch (exErr) {
         console.warn("     ⚠️ ดึง existing scores ไม่สำเร็จ:", exErr.message);
@@ -643,21 +657,17 @@ async function main() {
 
       const isInitialImport = existingMap.size === 0 && results.length > 5;
 
-      // 1. บันทึก / อัปเดตข้อมูลผู้เล่นลงตาราง players
-      const playerUpserts = results.map((r) => ({
-        id: r.userId,
-        username: r.username,
-        updated_at: new Date().toISOString(),
-      }));
+      // รวบรวมข้อมูลผู้เล่น (Deduplicate ตาม userId)
+      for (const r of results) {
+        allPlayerUpsertsMap.set(r.userId, {
+          id: r.userId,
+          username: r.username,
+          updated_at: new Date().toISOString(),
+        });
+      }
 
-      const { error: pErr } = await supabase
-        .from("players")
-        .upsert(playerUpserts, { onConflict: "id" });
-
-      if (pErr) console.warn("     ⚠️ เตือน: อัปเดตตาราง players ไม่สำเร็จ:", pErr.message);
-
-      // 2. บันทึก / อัปเดตคะแนนลงตาราง scores (พร้อมเวลาที่เล่นจริง played_at)
-      const scoreUpserts = results.map((r) => {
+      // รวบรวมคะแนนของ Seed นี้ไว้ใน Array รวม
+      for (const r of results) {
         const itemObj = {
           challenge_id: challenge.id,
           player_id: r.userId,
@@ -671,32 +681,66 @@ async function main() {
         };
         if (r.playedAt) itemObj.played_at = r.playedAt;
         if (r.totalTime) itemObj.total_time = r.totalTime;
-        return itemObj;
-      });
+        allScoreUpserts.push(itemObj);
+      }
 
+      // บันทึกรายการแจ้งเตือนที่ต้องส่ง Discord
+      if (newPlayers.length > 0 || updatedPlayers.length > 0) {
+        pendingNotifications.push({
+          challenge,
+          week,
+          newPlayers,
+          updatedPlayers,
+          isInitialImport,
+        });
+      }
+    }
+
+    // ================================================================
+    // บันทึกข้อมูลลงฐานข้อมูลแบบ Batch ครั้งเดียวจบ (One-shot Update)
+    // ================================================================
+    if (allPlayerUpsertsMap.size > 0) {
+      console.log(`\n  💾 กำลังบันทึกข้อมูลผู้เล่นรวม ${allPlayerUpsertsMap.size} คน...`);
+      const playerUpserts = Array.from(allPlayerUpsertsMap.values());
+      const { error: pErr } = await supabase
+        .from("players")
+        .upsert(playerUpserts, { onConflict: "id" });
+      if (pErr) console.warn("  ⚠️ เตือน: อัปเดตตาราง players ไม่สำเร็จ:", pErr.message);
+    }
+
+    if (allScoreUpserts.length > 0) {
+      console.log(`  💾 กำลังบันทึกคะแนนรวม ${allScoreUpserts.length} รายการ (Batch Upsert 7 Seeds)...`);
       let { error: sErr } = await supabase
         .from("scores")
-        .upsert(scoreUpserts, { onConflict: "challenge_id,player_id" });
+        .upsert(allScoreUpserts, { onConflict: "challenge_id,player_id" });
 
-      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ played_at หรือ total_time ให้บันทึกแบบเดิมไม่ให้พัง
+      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ played_at หรือ total_time ให้บันทึกแบบเดิม
       if (
         sErr &&
         (sErr.message?.includes("played_at") ||
           sErr.message?.includes("total_time") ||
           sErr.code === "PGRST204")
       ) {
-        console.warn("     ℹ️ ตาราง scores ยังไม่มีคอลัมน์ played_at / total_time (ลองบันทึกเฉพาะคะแนนแบบเดิม)...");
-        const fallbackUpserts = scoreUpserts.map(({ played_at, total_time, ...rest }) => rest);
+        console.warn("  ℹ️ ตาราง scores ยังไม่มีคอลัมน์ played_at / total_time (ลองบันทึกเฉพาะคะแนนแบบเดิม)...");
+        const fallbackUpserts = allScoreUpserts.map(({ played_at, total_time, ...rest }) => rest);
         const { error: fbErr } = await supabase
           .from("scores")
           .upsert(fallbackUpserts, { onConflict: "challenge_id,player_id" });
-        if (fbErr) console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fbErr.message);
+        if (fbErr) console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fbErr.message);
       } else if (sErr) {
-        console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
+        console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
       }
+    }
 
-      // 3. ส่งการแจ้งเตือนไปยัง Discord เมื่อมีคะแนนใหม่หรือมีการอัปเดต
-      await notifyScoreChanges(challenge, week, newPlayers, updatedPlayers, isInitialImport);
+    // ส่งแจ้งเตือน Discord สำหรับทุก Challenge ที่มีคะแนนใหม่
+    for (const notif of pendingNotifications) {
+      await notifyScoreChanges(
+        notif.challenge,
+        notif.week,
+        notif.newPlayers,
+        notif.updatedPlayers,
+        notif.isInitialImport
+      );
     }
 
     // อัปเดตเวลา Last Update ของสัปดาห์นี้

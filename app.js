@@ -1252,14 +1252,22 @@ function setupRealtime() {
   }
 }
 
+let isRealtimeRefreshing = false;
+
 function handleRealtimeUpdate() {
   clearTimeout(realtimeDebounceTimer);
   realtimeDebounceTimer = setTimeout(async () => {
-    console.log("🔄 Realtime update triggered - refreshing active week data");
-    if (currentWeek) {
-      await selectWeek(currentWeek.id);
+    if (isRealtimeRefreshing) return;
+    try {
+      isRealtimeRefreshing = true;
+      console.log("🔄 Realtime update triggered - refreshing active week data");
+      if (currentWeek) {
+        await selectWeek(currentWeek.id);
+      }
+    } finally {
+      isRealtimeRefreshing = false;
     }
-  }, 2000);
+  }, 2500);
 }
 
 /**
