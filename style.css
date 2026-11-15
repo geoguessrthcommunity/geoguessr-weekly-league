@@ -359,6 +359,7 @@ body {
   border-bottom: 6px solid #07162c !important;
   padding: 8px 6px !important;
   vertical-align: top;
+  min-width: 126px;
 }
 
 .th-top-map.m1 { background: var(--map1-color); }
@@ -402,7 +403,7 @@ body {
   color: rgba(255, 255, 255, 0.95);
   line-height: 1.25;
   word-break: break-word;
-  max-width: 130px;
+  max-width: 140px;
 }
 
 .th-sub {
@@ -421,7 +422,8 @@ body {
 }
 
 .col-pos {
-  width: 55px;
+  width: 58px;
+  min-width: 55px;
   font-weight: 700 !important;
 }
 
@@ -466,7 +468,8 @@ td.col-rank.rank-bronze {
   text-align: left !important;
   padding-left: 12px !important;
   font-weight: 600;
-  max-width: 180px;
+  min-width: 170px;
+  max-width: 260px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -477,21 +480,24 @@ td.col-rank.rank-bronze {
   font-weight: 800 !important;
   background-color: #f8fafc;
   color: var(--navy-primary);
-  width: 80px;
+  width: 85px;
+  min-width: 80px;
   border-right: 6px solid #07162c !important;
 }
 
-/* Map Points Column: NOT BOLD */
+/* Map Points Column: NOT BOLD - Expanded width */
 .col-pts {
-  width: 55px;
+  width: 70px;
+  min-width: 66px;
   font-variant-numeric: tabular-nums;
   font-weight: 400 !important;
   color: #334155;
 }
 
-/* Map Rank Column: BOLD with thick right divider gap */
+/* Map Rank Column: BOLD with thick right divider gap - Expanded width */
 .col-rank {
-  width: 45px;
+  width: 56px;
+  min-width: 52px;
   color: #1e293b;
   font-size: 0.85rem;
   font-weight: 700 !important;
