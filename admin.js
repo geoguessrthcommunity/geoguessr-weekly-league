@@ -514,6 +514,15 @@ let currentScoresWeekId = null;
 let currentWeekChallenges = [];
 let currentWeekScores = [];
 
+function formatDuration(sec) {
+  if (sec === null || sec === undefined || isNaN(sec)) return "";
+  const s = Math.round(Number(sec));
+  const mins = Math.floor(s / 60);
+  const remainingSecs = s % 60;
+  if (mins === 0) return `${remainingSecs}s`;
+  return `${mins}:${remainingSecs.toString().padStart(2, "0")}`;
+}
+
 window.openScoresModal = async function (weekId, weekTitle) {
   currentScoresWeekId = weekId;
   const modal = document.getElementById("scoresModal");
@@ -521,6 +530,9 @@ window.openScoresModal = async function (weekId, weekTitle) {
   document.getElementById("scoresModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
   document.getElementById("scoresSearchInput").value = "";
   document.getElementById("scoresFilterMap").value = "all";
+  if (document.getElementById("scoresSortBy")) {
+    document.getElementById("scoresSortBy").value = "time_desc";
+  }
 
   modal.classList.add("open");
   await loadScoresForWeek(weekId);
@@ -533,7 +545,7 @@ window.closeScoresModal = function () {
 async function loadScoresForWeek(weekId) {
   if (!adminDb) return;
   const tbody = document.getElementById("scoresTableBody");
-  tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #64748b;">⏳ กำลังโหลดข้อมูลคะแนน...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 24px; color: #64748b;">⏳ กำลังโหลดข้อมูลคะแนน...</td></tr>`;
 
   try {
     // 1. ดึง Challenges ทั้งหมดของสัปดาห์นี้
@@ -547,18 +559,17 @@ async function loadScoresForWeek(weekId) {
     currentWeekChallenges = challenges || [];
 
     if (currentWeekChallenges.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบข้อมูล Map ในสัปดาห์นี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบข้อมูล Map ในสัปดาห์นี้</td></tr>`;
       return;
     }
 
     const chIds = currentWeekChallenges.map((c) => c.id);
 
-    // 2. ดึงคะแนนทั้งหมดของ Challenges ในสัปดาห์นี้ พร้อมข้อมูล players
+    // 2. ดึงคะแนนทั้งหมดของ Challenges ในสัปดาห์นี้ พร้อมข้อมูล players, played_at, total_time
     const { data: scores, error: scErr } = await adminDb
       .from("scores")
-      .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, players(id, username)")
-      .in("challenge_id", chIds)
-      .order("total_score", { ascending: false });
+      .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time, updated_at, players(id, username)")
+      .in("challenge_id", chIds);
 
     if (scErr) throw scErr;
     currentWeekScores = scores || [];
@@ -566,13 +577,31 @@ async function loadScoresForWeek(weekId) {
     renderScoresList();
   } catch (err) {
     console.error("Load Scores Error:", err);
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: red; padding: 24px;">เกิดข้อผิดพลาดในการโหลดคะแนน: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: red; padding: 24px;">เกิดข้อผิดพลาดในการโหลดคะแนน: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
+
+window.toggleScoresSort = function (type) {
+  const select = document.getElementById("scoresSortBy");
+  if (!select) return;
+  const current = select.value;
+
+  if (type === "time") {
+    select.value = current === "time_desc" ? "time_asc" : "time_desc";
+  } else if (type === "score") {
+    select.value = current === "score_desc" ? "score_asc" : "score_desc";
+  } else if (type === "player") {
+    select.value = current === "player_asc" ? "player_desc" : "player_asc";
+  } else if (type === "map") {
+    select.value = current === "map_asc" ? "map_desc" : "map_asc";
+  }
+  renderScoresList();
+};
 
 window.renderScoresList = function () {
   const mapFilter = document.getElementById("scoresFilterMap").value;
   const searchFilter = (document.getElementById("scoresSearchInput").value || "").trim().toLowerCase();
+  const sortBy = document.getElementById("scoresSortBy")?.value || "time_desc";
   const tbody = document.getElementById("scoresTableBody");
 
   const chMap = {};
@@ -594,8 +623,63 @@ window.renderScoresList = function () {
 
   document.getElementById("scoresTotalCount").textContent = filtered.length;
 
+  // Update sort icons in table header
+  const iconMap = { player: "", map: "", time: "", score: "" };
+  if (sortBy === "time_desc") iconMap.time = "▼";
+  else if (sortBy === "time_asc") iconMap.time = "▲";
+  else if (sortBy === "score_desc") iconMap.score = "▼";
+  else if (sortBy === "score_asc") iconMap.score = "▲";
+  else if (sortBy === "player_asc") iconMap.player = "▲";
+  else if (sortBy === "player_desc") iconMap.player = "▼";
+  else if (sortBy === "map_asc") iconMap.map = "▲";
+  else if (sortBy === "map_desc") iconMap.map = "▼";
+
+  if (document.getElementById("sortIconPlayer")) document.getElementById("sortIconPlayer").textContent = iconMap.player;
+  if (document.getElementById("sortIconMap")) document.getElementById("sortIconMap").textContent = iconMap.map;
+  if (document.getElementById("sortIconTime")) document.getElementById("sortIconTime").textContent = iconMap.time;
+  if (document.getElementById("sortIconScore")) document.getElementById("sortIconScore").textContent = iconMap.score;
+
+  // Sorting
+  filtered.sort((a, b) => {
+    const chA = chMap[a.challenge_id] || { seed_number: 99 };
+    const chB = chMap[b.challenge_id] || { seed_number: 99 };
+    const nameA = (a.players?.username || "").toLowerCase();
+    const nameB = (b.players?.username || "").toLowerCase();
+    const totalA = a.total_score ?? ((a.r1 || 0) + (a.r2 || 0) + (a.r3 || 0) + (a.r4 || 0) + (a.r5 || 0));
+    const totalB = b.total_score ?? ((b.r1 || 0) + (b.r2 || 0) + (b.r3 || 0) + (b.r4 || 0) + (b.r5 || 0));
+
+    const timeA = a.played_at ? new Date(a.played_at).getTime() : (a.updated_at ? new Date(a.updated_at).getTime() : 0);
+    const timeB = b.played_at ? new Date(b.played_at).getTime() : (b.updated_at ? new Date(b.updated_at).getTime() : 0);
+
+    const durA = Number(a.total_time) || 999999;
+    const durB = Number(b.total_time) || 999999;
+
+    switch (sortBy) {
+      case "time_desc":
+        return timeB - timeA || totalB - totalA;
+      case "time_asc":
+        return timeA - timeB || totalB - totalA;
+      case "score_desc":
+        return totalB - totalA || timeB - timeA;
+      case "score_asc":
+        return totalA - totalB || timeB - timeA;
+      case "map_asc":
+        return chA.seed_number - chB.seed_number || totalB - totalA;
+      case "map_desc":
+        return chB.seed_number - chA.seed_number || totalB - totalA;
+      case "player_asc":
+        return nameA.localeCompare(nameB) || totalB - totalA;
+      case "player_desc":
+        return nameB.localeCompare(nameA) || totalB - totalA;
+      case "duration_asc":
+        return durA - durB || totalB - totalA;
+      default:
+        return timeB - timeA || totalB - totalA;
+    }
+  });
+
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบคะแนนที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบคะแนนที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
     return;
   }
 
@@ -605,31 +689,62 @@ window.renderScoresList = function () {
       const username = s.players?.username || `Player #${s.player_id}`;
       const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
 
+      let timeDisplay = `<span style="color: #94a3b8; font-size: 0.78rem;">-</span>`;
+      if (s.played_at) {
+        const d = new Date(s.played_at);
+        if (!isNaN(d.getTime())) {
+          const dateStr = d.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" });
+          const timeStr = d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+          timeDisplay = `
+            <div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${dateStr}</div>
+            <div style="font-size: 0.72rem; color: #64748b;">🕐 ${timeStr} น.</div>
+          `;
+        }
+      } else if (s.updated_at) {
+        const d = new Date(s.updated_at);
+        if (!isNaN(d.getTime())) {
+          const dateStr = d.toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+          const timeStr = d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+          timeDisplay = `
+            <div style="color: #64748b; font-size: 0.75rem;" title="เวลาที่บันทึกลงระบบ">${dateStr} ${timeStr}</div>
+            <div style="font-size: 0.68rem; color: #94a3b8;">(เวลา Sync)</div>
+          `;
+        }
+      }
+
+      const durText = s.total_time ? `<div style="font-size: 0.72rem; color: #0284c7; font-weight: 600; margin-top: 2px;">⚡ ${formatDuration(s.total_time)}</div>` : "";
+
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="text-align: center; padding: 8px; color: #64748b;">${idx + 1}</td>
-          <td style="padding: 8px 12px; font-weight: bold; color: #1e293b;">${escapeHtml(username)}</td>
+          <td style="text-align: center; padding: 8px; color: #64748b; font-size: 0.8rem;">${idx + 1}</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #1e293b;">
+            <div>${escapeHtml(username)}</div>
+          </td>
           <td style="text-align: center; padding: 8px;">
             <span style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;">
               Map ${ch.seed_number}
             </span>
-            <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${renderFlags(escapeHtml(ch.name || ""))}</div>
+            <div style="font-size: 0.73rem; color: #64748b; margin-top: 2px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${renderFlags(escapeHtml(ch.name || ""))}</div>
+          </td>
+          <td style="text-align: center; padding: 6px 8px; background: #fffbeb;">
+            ${timeDisplay}
           </td>
           <td style="text-align: center; padding: 8px; color: #475569;">${(s.r1 ?? 0).toLocaleString()}</td>
           <td style="text-align: center; padding: 8px; color: #475569;">${(s.r2 ?? 0).toLocaleString()}</td>
           <td style="text-align: center; padding: 8px; color: #475569;">${(s.r3 ?? 0).toLocaleString()}</td>
           <td style="text-align: center; padding: 8px; color: #475569;">${(s.r4 ?? 0).toLocaleString()}</td>
           <td style="text-align: center; padding: 8px; color: #475569;">${(s.r5 ?? 0).toLocaleString()}</td>
-          <td style="text-align: center; padding: 8px; font-weight: bold; background: #f8fafc; color: #00247d;">
-            ${total.toLocaleString()}
+          <td style="text-align: center; padding: 8px; font-weight: bold; background: #eff6ff; color: #1e3a8a;">
+            <div>${total.toLocaleString()}</div>
+            ${durText}
           </td>
           <td style="text-align: center; padding: 8px;">
             <div style="display: flex; gap: 4px; justify-content: center;">
               <button class="btn btn-delete-score" onclick="deleteScore(${s.id})" title="ลบคะแนนแมพนี้เฉพาะรายการนี้">
-                🗑️ ลบแมพนี้
+                🗑️ ลบ
               </button>
               <button class="btn btn-dq" onclick="disqualifyPlayerByScore(${s.id})" title="ตัดสิทธิ์ผู้เล่นคนนี้ ล้างคะแนนทุกแมพในสัปดาห์นี้">
-                🚫 DQ วีคนี้
+                🚫 DQ
               </button>
             </div>
           </td>
