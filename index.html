@@ -30,24 +30,17 @@
       </div>
     </div>
 
-    <!-- 2. Top Section: Logo + 7 Map Cards -->
-    <div id="topSection" class="top-section">
+    <!-- 2. Top Section: Preserved for backwards compatibility, hidden in favor of in-table header cards -->
+    <div id="topSection" class="top-section" style="display: none !important;">
       <!-- Logo Box -->
       <div class="logo-container">
-        <img id="leagueLogo" src="logo.png" class="logo-img" alt="League Logo"
-          onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+        <img id="leagueLogo" src="logo.png" class="logo-img" alt="League Logo">
         <div id="logoPlaceholder" class="logo-placeholder" style="display: none;">
           <span class="league-badge">GEOGUESSR</span>
-          <span style="font-size: 0.75rem; color: #94a3b8;">(Add logo.png to folder)</span>
         </div>
       </div>
-
       <!-- 7 Map Cards -->
-      <div id="mapsGrid" class="maps-grid">
-        <div style="color: white; grid-column: span 7; text-align: center; padding: 20px;">
-          Loading 7 Maps...
-        </div>
-      </div>
+      <div id="mapsGrid" class="maps-grid"></div>
     </div>
 
     <!-- 3. Sub-Navigation View Switcher (Hidden when week is active, shown when week is frozen) -->
@@ -65,13 +58,23 @@
       <table class="sheets-table">
         <thead>
           <tr id="tableTopHeaderRow">
-            <th class="col-pos" rowspan="2">Position</th>
-            <th class="col-player" rowspan="2">Pseudo</th>
-            <th class="col-total" rowspan="2">Points</th>
-            <!-- Map 1 to 7 columns generated dynamically -->
+            <th class="th-logo-cell" colspan="3">
+              <div class="table-logo-card">
+                <img src="logo.png" class="table-logo-img" alt="League Logo"
+                  onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                <div class="table-logo-placeholder" style="display: none;">
+                  <span class="table-league-badge">GEOGUESSR</span>
+                  <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">THAILAND LEAGUE</span>
+                </div>
+              </div>
+            </th>
+            <!-- Map 1 to 7 header cards generated dynamically -->
           </tr>
           <tr id="tableSubHeaderRow">
-            <!-- Points | Rank for each map -->
+            <th class="th-sub col-pos">Position</th>
+            <th class="th-sub col-player">Pseudo</th>
+            <th class="th-sub col-total">Points</th>
+            <!-- Points | Rank for each map generated dynamically -->
           </tr>
         </thead>
         <tbody id="scoresTableBody">

@@ -362,6 +362,7 @@ window.setRulesLang = function (lang) {
  * 6. Render the 7 Map Cards
  */
 function renderMapCards(challenges) {
+  if (!mapsGrid) return;
   if (!challenges.length) {
     mapsGrid.innerHTML = `<div style="grid-column: span 7; color: white; text-align: center;">No map data available</div>`;
     return;
@@ -376,7 +377,7 @@ function renderMapCards(challenges) {
           <div class="map-desc">${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}</div>
         </div>
         <a href="${c.url}" target="_blank" rel="noopener noreferrer" class="map-btn">
-          ▶ Play Challenge
+          ▶ Play
         </a>
       </div>
     `;
@@ -385,22 +386,48 @@ function renderMapCards(challenges) {
 }
 
 /**
- * 7. Render Table Headers
+ * 7. Render Table Headers (Directly locks Map Cards above score columns)
  */
 function renderTableHeaders(challenges) {
   tableTopHeaderRow.innerHTML = `
-    <th class="col-pos" rowspan="2">Position</th>
-    <th class="col-player" rowspan="2">Pseudo</th>
-    <th class="col-total" rowspan="2">Points</th>
+    <th class="th-logo-cell" colspan="3">
+      <div class="table-logo-card">
+        <img src="logo.png" class="table-logo-img" alt="League Logo"
+          onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+        <div class="table-logo-placeholder" style="display: none;">
+          <span class="table-league-badge">GEOGUESSR</span>
+          <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">THAILAND LEAGUE</span>
+        </div>
+      </div>
+    </th>
   `;
-  tableSubHeaderRow.innerHTML = ``;
+
+  tableSubHeaderRow.innerHTML = `
+    <th class="th-sub col-pos">Position</th>
+    <th class="th-sub col-player">Pseudo</th>
+    <th class="th-sub col-total">Points</th>
+  `;
 
   challenges.forEach((c) => {
-    const thTop = document.createElement("th");
-    thTop.colSpan = 2;
-    thTop.className = `th-top-map m${c.seed_number}`;
-    thTop.textContent = `Map ${c.seed_number}`;
-    tableTopHeaderRow.appendChild(thTop);
+    const playUrl = c.url || "#";
+    const mapName = c.name || `Seed ${c.seed_number}`;
+
+    tableTopHeaderRow.insertAdjacentHTML(
+      "beforeend",
+      `
+      <th class="th-top-map m${c.seed_number}" colspan="2">
+        <div class="table-map-card">
+          <div class="map-card-info">
+            <div class="map-card-title">Map ${c.seed_number}</div>
+            <div class="map-card-desc">${renderFlags(escapeHtml(mapName))}</div>
+          </div>
+          <a href="${escapeHtml(playUrl)}" target="_blank" rel="noopener noreferrer" class="map-btn">
+            ▶ Play
+          </a>
+        </div>
+      </th>
+    `
+    );
 
     tableSubHeaderRow.insertAdjacentHTML(
       "beforeend",
