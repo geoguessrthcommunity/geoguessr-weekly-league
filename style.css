@@ -538,6 +538,63 @@ td.col-rank.rank-bronze {
   border-color: var(--navy-primary);
 }
 
+.raw-subview-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f1f5f9;
+  border-bottom: 2px solid var(--table-border);
+  padding: 8px 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.raw-sub-btn {
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #334155;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.raw-sub-btn:hover {
+  background: #e2e8f0;
+}
+
+.raw-sub-btn.active {
+  background: var(--navy-primary);
+  color: white;
+  border-color: var(--navy-primary);
+}
+
+.raw-round-btn {
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #475569;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.raw-round-btn:hover {
+  background: #e2e8f0;
+}
+
+.raw-round-btn.active {
+  background: #0284c7;
+  color: white;
+  border-color: #0284c7;
+}
+
 .raw-cell {
   padding: 6px 4px !important;
   vertical-align: middle;

@@ -46,10 +46,10 @@
     <!-- 3. Sub-Navigation View Switcher (Hidden when week is active, shown when week is frozen) -->
     <div id="viewSwitchBar" class="view-switch-bar" style="display: none;">
       <button id="viewBtnLeaderboard" class="view-tab-btn active" onclick="switchMainView('leaderboard')">
-        🏆 Leaderboard
+        🏆 Leaderboard (คะแนนรวม)
       </button>
       <button id="viewBtnRaw" class="view-tab-btn" onclick="switchMainView('raw')">
-        📊 Raw & Round Scores
+        🧮 ตรวจสอบการคิดคะแนน & คะแนนดิบ
       </button>
     </div>
 
@@ -92,28 +92,46 @@
       <div class="table-wrapper">
         <!-- Map Selector Pills -->
         <div class="raw-controls-bar">
-          <strong style="color: #475569; font-size: 0.9rem; margin-right: 6px;">Select Map:</strong>
+          <strong style="color: #475569; font-size: 0.9rem; margin-right: 6px;">เลือกแมพ (Select Map):</strong>
           <div id="rawMapSelectorPills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
         </div>
 
+        <!-- Sub-View Switcher (Map Summary vs Round Deep-Dive) -->
+        <div class="raw-subview-bar">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button id="rawBtnMapSummary" class="raw-sub-btn active" onclick="setRawSubView('map')">
+              📊 สรุปคะแนนภาพรวม (Map Leaderboard)
+            </button>
+            <button id="rawBtnRoundDeep" class="raw-sub-btn" onclick="setRawSubView('round')">
+              🔍 เจาะลึกการคำนวณรายรอบ (Round Deep-Dive)
+            </button>
+          </div>
+
+          <!-- Round Selector Pills (Only visible when view is 'round') -->
+          <div id="rawRoundSelectorContainer" style="display: none; align-items: center; gap: 4px; flex-wrap: wrap;">
+            <span style="font-size: 0.8rem; font-weight: bold; color: #64748b; margin-right: 2px;">เลือกรอบ:</span>
+            <button class="raw-round-btn active" data-rnd="0" onclick="selectRawRound(0)">R1</button>
+            <button class="raw-round-btn" data-rnd="1" onclick="selectRawRound(1)">R2</button>
+            <button class="raw-round-btn" data-rnd="2" onclick="selectRawRound(2)">R3</button>
+            <button class="raw-round-btn" data-rnd="3" onclick="selectRawRound(3)">R4</button>
+            <button class="raw-round-btn" data-rnd="4" onclick="selectRawRound(4)">R5</button>
+            <button class="raw-round-btn" data-rnd="5" onclick="selectRawRound(5)">Total (25k)</button>
+          </div>
+        </div>
+
         <table class="sheets-table">
-          <thead>
-            <tr>
-              <th style="width: 60px;">#</th>
-              <th style="text-align: left; padding-left: 12px; width: 180px;">Pseudo</th>
-              <th style="width: 100px;">Round 1</th>
-              <th style="width: 100px;">Round 2</th>
-              <th style="width: 100px;">Round 3</th>
-              <th style="width: 100px;">Round 4</th>
-              <th style="width: 100px;">Round 5</th>
-              <th style="width: 120px; background: #eff6ff; color: #1e3a8a;">Total (25k)</th>
-              <th style="width: 100px; background: #00247d; color: white;">Map Points</th>
-            </tr>
+          <thead id="rawTableHead">
+            <!-- Headers rendered dynamically by renderRawScoresView() -->
           </thead>
           <tbody id="rawTableBody">
             <!-- Round-by-round raw scores rendered dynamically -->
           </tbody>
         </table>
+
+        <!-- Calculation footnote -->
+        <div style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid var(--table-border); font-size: 0.8rem; color: #64748b;">
+          * คำนวณด้วยระบบ Pairwise Head-to-Head (Half-Tie: ชนะ 1 แต้ม, เสมอ 0.5 แต้ม, แพ้ 0 แต้ม) เทียบกับ Phantom Score (บวก 10% ของคะแนนที่ขาด) ของคู่แข่งทุกคนในรอบนั้น
+        </div>
       </div>
     </div>
 

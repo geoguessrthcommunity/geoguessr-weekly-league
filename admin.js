@@ -1391,6 +1391,15 @@ function getRankClass(rank) {
   return "";
 }
 
+function formatPlayedTime(dateStr) {
+  if (!dateStr) return '<span style="color: #94a3b8; font-size: 0.78rem;">-</span>';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '<span style="color: #94a3b8; font-size: 0.78rem;">-</span>';
+  const datePart = d.toLocaleDateString("th-TH", { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `<span title="${escapeHtml(d.toLocaleString("th-TH"))}" style="font-size: 0.75rem; color: #475569; font-weight: 600;">${datePart}, ${timePart}</span>`;
+}
+
 window.openMapInspectorModal = async function (weekId, weekTitle) {
   if (!adminDb) return;
   inspWeekId = weekId;
@@ -1453,6 +1462,7 @@ function computeInspectorCalculations() {
       scoreId: s.id,
       playerId: s.player_id,
       username: s.players?.username || `Player #${s.player_id}`,
+      playedAt: s.played_at || null,
       raw: [
         s.r1 || 0,
         s.r2 || 0,
@@ -1577,20 +1587,21 @@ function renderMapInspector() {
 
     thead.innerHTML = `
       <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-        <th style="width: 55px; text-align: center; padding: 8px;">อันดับ</th>
-        <th style="text-align: left; padding: 8px 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
-        <th style="width: 75px; text-align: center;">R1</th>
-        <th style="width: 75px; text-align: center;">R2</th>
-        <th style="width: 75px; text-align: center;">R3</th>
-        <th style="width: 75px; text-align: center;">R4</th>
-        <th style="width: 75px; text-align: center;">R5</th>
-        <th style="width: 95px; text-align: center; background: #eff6ff; color: #1e3a8a;">Total 25k</th>
-        <th style="width: 90px; text-align: center; background: #00247d; color: white;">Map Points</th>
+        <th style="width: 50px; text-align: center; padding: 8px;">อันดับ</th>
+        <th style="text-align: left; padding: 8px 12px; width: 160px;">ผู้เล่น (Pseudo)</th>
+        <th style="width: 110px; text-align: center; color: #475569;">เวลาที่เล่น</th>
+        <th style="width: 70px; text-align: center;">R1</th>
+        <th style="width: 70px; text-align: center;">R2</th>
+        <th style="width: 70px; text-align: center;">R3</th>
+        <th style="width: 70px; text-align: center;">R4</th>
+        <th style="width: 70px; text-align: center;">R5</th>
+        <th style="width: 90px; text-align: center; background: #eff6ff; color: #1e3a8a;">Total 25k</th>
+        <th style="width: 85px; text-align: center; background: #00247d; color: white;">Map Points</th>
       </tr>
     `;
 
     if (pList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
       return;
     }
 
@@ -1612,6 +1623,7 @@ function renderMapInspector() {
           <tr style="border-bottom: 1px solid #e2e8f0;">
             <td class="col-pos ${rankCls}" style="text-align: center;">${p.mapRank}</td>
             <td style="padding: 6px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
+            <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
             ${roundCells}
             <td style="text-align: center; padding: 6px 4px; background: #eff6ff;">
               <div style="font-weight: 700; color: #1e3a8a;">${p.raw[5].toLocaleString()}</div>
@@ -1648,17 +1660,18 @@ function renderMapInspector() {
 
     thead.innerHTML = `
       <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-        <th style="width: 55px; text-align: center; padding: 8px;">อันดับ</th>
-        <th style="text-align: left; padding: 8px 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
-        <th style="width: 100px; text-align: center;">คะแนนดิบ (Raw)</th>
-        <th style="width: 110px; text-align: center; background: #eff6ff; color: #1e3a8a;">Phantom (10%)</th>
+        <th style="width: 50px; text-align: center; padding: 8px;">อันดับ</th>
+        <th style="text-align: left; padding: 8px 12px; width: 160px;">ผู้เล่น (Pseudo)</th>
+        <th style="width: 110px; text-align: center; color: #475569;">เวลาที่เล่น</th>
+        <th style="width: 95px; text-align: center;">คะแนนดิบ (Raw)</th>
+        <th style="width: 105px; text-align: center; background: #eff6ff; color: #1e3a8a;">Phantom (10%)</th>
         <th style="text-align: left; padding: 8px 12px;">ผลการเจอกับคู่แข่งอีก ${pList.length - 1} คน (H2H)</th>
-        <th style="width: 100px; text-align: center; background: #00247d; color: white;">แต้มรอบนี้</th>
+        <th style="width: 95px; text-align: center; background: #00247d; color: white;">แต้มรอบนี้</th>
       </tr>
     `;
 
     if (pList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
       return;
     }
 
@@ -1696,6 +1709,7 @@ function renderMapInspector() {
           <tr style="border-bottom: 1px solid #e2e8f0;">
             <td class="col-pos ${rankCls}" style="text-align: center;">${p.roundRank}</td>
             <td style="padding: 8px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
+            <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
             <td style="text-align: center; font-weight: 700; color: #0f172a;">${p.raw[m].toLocaleString()}</td>
             <td style="text-align: center; font-weight: 700; color: #1e3a8a; background: #f0f7ff;">${phantomVal}</td>
             <td style="padding: 8px 12px;">${outcomeBadge}</td>

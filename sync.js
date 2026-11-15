@@ -97,6 +97,21 @@ async function fetchChallengeResults(token) {
         const r5 = Number(guesses[4]?.roundScoreInPoints) || 0;
         const total = Number(item.totalScore ?? (r1 + r2 + r3 + r4 + r5)) || 0;
 
+        // ดึงเวลาที่เล่นจริง (Timestamp) จากรอบสุดท้าย หรือรอบแรก หรือข้อมูลเกม
+        const playedAt =
+          guesses[4]?.created ||
+          guesses[0]?.created ||
+          item.game?.player?.created ||
+          item.game?.created ||
+          item.created ||
+          null;
+
+        // ดึงเวลารวมที่ใช้เล่น (หน่วยเป็นวินาที)
+        const totalTime =
+          Number(item.game?.player?.totalTime) ||
+          guesses.reduce((sum, g) => sum + (Number(g?.time) || 0), 0) ||
+          null;
+
         players.push({
           userId,
           username,
@@ -106,6 +121,8 @@ async function fetchChallengeResults(token) {
           r4,
           r5,
           total,
+          playedAt,
+          totalTime,
         });
       }
 
@@ -227,24 +244,39 @@ async function main() {
 
       if (pErr) console.warn("     ⚠️ เตือน: อัปเดตตาราง players ไม่สำเร็จ:", pErr.message);
 
-      // 2. บันทึก / อัปเดตคะแนนลงตาราง scores
-      const scoreUpserts = results.map((r) => ({
-        challenge_id: challenge.id,
-        player_id: r.userId,
-        r1: r.r1,
-        r2: r.r2,
-        r3: r.r3,
-        r4: r.r4,
-        r5: r.r5,
-        total_score: r.total,
-        updated_at: new Date().toISOString(),
-      }));
+      // 2. บันทึก / อัปเดตคะแนนลงตาราง scores (พร้อมเวลาที่เล่นจริง played_at)
+      const scoreUpserts = results.map((r) => {
+        const itemObj = {
+          challenge_id: challenge.id,
+          player_id: r.userId,
+          r1: r.r1,
+          r2: r.r2,
+          r3: r.r3,
+          r4: r.r4,
+          r5: r.r5,
+          total_score: r.total,
+          updated_at: new Date().toISOString(),
+        };
+        if (r.playedAt) itemObj.played_at = r.playedAt;
+        if (r.totalTime) itemObj.total_time = r.totalTime;
+        return itemObj;
+      });
 
-      const { error: sErr } = await supabase
+      let { error: sErr } = await supabase
         .from("scores")
         .upsert(scoreUpserts, { onConflict: "challenge_id,player_id" });
 
-      if (sErr) console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
+      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ played_at หรือ total_time ให้บันทึกแบบเดิมไม่ให้พัง
+      if (sErr && (sErr.message?.includes("played_at") || sErr.message?.includes("total_time") || sErr.code === "PGRST204")) {
+        console.warn("     ℹ️ ตาราง scores ยังไม่มีคอลัมน์ played_at / total_time (ลองบันทึกเฉพาะคะแนนแบบเดิม)...");
+        const fallbackUpserts = scoreUpserts.map(({ played_at, total_time, ...rest }) => rest);
+        const { error: fbErr } = await supabase
+          .from("scores")
+          .upsert(fallbackUpserts, { onConflict: "challenge_id,player_id" });
+        if (fbErr) console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fbErr.message);
+      } else if (sErr) {
+        console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
+      }
     }
 
     // อัปเดตเวลา Last Update ของสัปดาห์นี้
