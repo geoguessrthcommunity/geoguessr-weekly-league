@@ -75,6 +75,13 @@ async function fetchChallengeResults(token) {
       const data = await resp.json();
       const items = Array.isArray(data?.items) ? data.items : [];
 
+      if (page === 0 && items.length > 0) {
+        console.log(`     🔍 [GeoGuessr Data Sample] Keys in item:`, Object.keys(items[0]));
+        if (items[0].game) console.log(`     🔍 [GeoGuessr Data Sample] Keys in item.game:`, Object.keys(items[0].game));
+        if (items[0].game?.player) console.log(`     🔍 [GeoGuessr Data Sample] Keys in item.game.player:`, Object.keys(items[0].game.player));
+        if (items[0].game?.player?.guesses?.[0]) console.log(`     🔍 [GeoGuessr Data Sample] Keys in guess[0]:`, Object.keys(items[0].game.player.guesses[0]));
+      }
+
       for (const item of items) {
         const userId = String(item.userId || item.game?.player?.id || "").trim();
         const username = String(item.playerName || item.game?.player?.nick || "Anonymous").trim();
@@ -99,12 +106,36 @@ async function fetchChallengeResults(token) {
 
         // ดึงเวลาที่เล่นจริง (Timestamp) จากรอบสุดท้าย หรือรอบแรก หรือข้อมูลเกม
         const playedAt =
+          guesses[4]?.createdAt ||
           guesses[4]?.created ||
+          guesses[4]?.date ||
+          guesses[0]?.createdAt ||
           guesses[0]?.created ||
+          guesses[0]?.date ||
+          item.game?.player?.createdAt ||
           item.game?.player?.created ||
+          item.game?.player?.date ||
+          item.game?.createdAt ||
           item.game?.created ||
+          item.game?.date ||
+          item.createdAt ||
           item.created ||
-          null;
+          item.date ||
+          item.timestamp ||
+          (function scan(obj, depth = 0) {
+            if (!obj || depth > 4) return null;
+            if (typeof obj === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(obj)) return obj;
+            if (typeof obj === "object") {
+              for (const [k, v] of Object.entries(obj)) {
+                if (/create|date|play|time/i.test(k) && typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return v;
+              }
+              for (const v of Object.values(obj)) {
+                const found = scan(v, depth + 1);
+                if (found) return found;
+              }
+            }
+            return null;
+          })(item);
 
         // ดึงเวลารวมที่ใช้เล่น (หน่วยเป็นวินาที)
         const totalTime =
