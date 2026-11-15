@@ -49,10 +49,28 @@
 * **ทางเลือก A (รันบน GitHub Actions 24 ชม. แม้ปิดคอม):**
   1. Push โค้ดขึ้น GitHub
   2. ไปที่ Settings -> Secrets and variables -> Actions
-  3. ใส่ Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEOGUESSR_COOKIE` (คุกกี้ `_ncfa` จากบอท)
+  3. ใส่ Secrets พื้นฐาน: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEOGUESSR_COOKIE` (คุกกี้ `_ncfa` จากบอท)
+  4. (ทางเลือก) ใส่ Secrets สำหรับ Discord Alerts:
+     - แบบ Webhook: ใส่ `DISCORD_WEBHOOK_URL`
+     - หรือแบบ Bot Token: ใส่ `DISCORD_BOT_TOKEN` และ `DISCORD_ADMIN_CHANNEL_ID`
 * **ทางเลือก B (รันบนคอมตัวเอง ไม่ต้องใช้ GitHub):**
-  1. สร้างไฟล์ `.env` แล้วใส่ `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEOGUESSR_COOKIE`
+  1. สร้างไฟล์ `.env` แล้วใส่ `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEOGUESSR_COOKIE` (และค่า Discord ถ้ามี)
   2. ดับเบิ้ลคลิกไฟล์ `start-sync.bat` บนเครื่อง มันจะวนลูปดึงคะแนนให้ทุก 30 นาทีอัตโนมัติ
+
+---
+
+## 🔔 ระบบแจ้งเตือน Discord (Discord Alerts สำหรับแอดมิน)
+ระบบจะส่งการแจ้งเตือนแบบ **Embed Cards** ไปยัง Discord อัตโนมัติในทุกรอบ Sync (ทุก 30 นาที):
+1. **คะแนนใหม่ / คนเล่นใหม่ (New Score Alert):** แจ้งชื่อผู้เล่น, ชื่อด่าน, คะแนนรวม, คะแนนรอบ R1-R5, ระยะเวลาที่เล่น และเวลาที่เล่น
+2. **ไฮไลต์ 25,000 แต้มเต็ม (Perfect Score Alert):** การ์ดสีทองพิเศษฉลองให้ผู้ที่ทำคะแนนเต็ม 25k
+3. **คะแนนที่มีการอัปเดต (Updated Score):** แจ้งเตือนเมื่อคะแนนเดิมมีการเปลี่ยนแปลง
+4. **สรุปผลเมื่อจบสัปดาห์ (Auto-Freeze Podium Summary):** เมื่อถึงเวลาตัดรอบและระบบ Freeze อัตโนมัติ จะส่งสรุปโพเดียมอันดับ 1-3 🥇🥈🥉 และยอดรวมผู้เข้าแข่งขันทั้งหมด
+5. **แจ้งเตือน Cookie หมดอายุ (Sync Health / Auth Alert):** เตือนแอดมินทันทีเมื่อ Cookie GeoGuessr หลุด/หมดอายุ (HTTP 401) เพื่อให้อัปเดตได้ทันท่วงที
+
+### การตั้งค่า Discord:
+- **แบบที่ 1 (ง่ายสุด):** สร้าง Webhook ในห้อง Discord (Edit Channel -> Integrations -> Webhooks) แล้วนำ URL ไปใส่ใน GitHub Secrets ชื่อ `DISCORD_WEBHOOK_URL`
+- **แบบที่ 2 (ส่งในนามบอทของตัวเอง):** ใส่ `DISCORD_BOT_TOKEN` และ `DISCORD_ADMIN_CHANNEL_ID` ใน GitHub Secrets (บอทไม่ต้องเปิดเซิร์ฟเวอร์รันค้างไว้ ระบบจะส่งผ่าน REST API อัตโนมัติ)
+- **ทดสอบส่งข้อความ:** พิมพ์คำสั่ง `npm run test-discord` ในเครื่องเพื่อทดสอบได้ทันที
 
 ---
 

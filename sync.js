@@ -1,6 +1,7 @@
 // ====================================================================
 // GeoGuessr Weekly Challenge Sync Worker (Node.js)
 // ดึงคะแนนจาก GeoGuessr API และบันทึกลง Supabase
+// พร้อมระบบ Discord Notifications สำหรับแจ้งเตือนแอดมินอัตโนมัติ
 // รันอัตโนมัติผ่าน GitHub Actions หรือ Cron ทุก 30 นาที
 // ====================================================================
 
@@ -20,6 +21,11 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEOGUESSR_COOKIE = process.env.GEOGUESSR_COOKIE; // ค่าคุกกี้ _ncfa
 const BOT_USER_ID = process.env.BOT_USER_ID || ""; // ไอดีบัญชีบอทเพื่อกรองออก (ถ้ามี)
 
+// Discord Notification Configurations (รองรับทั้ง Webhook URL และ Bot Token + Channel ID)
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const DISCORD_ADMIN_CHANNEL_ID = process.env.DISCORD_ADMIN_CHANNEL_ID;
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("❌ ขาด SUPABASE_URL หรือ SUPABASE_SERVICE_ROLE_KEY ใน Environment Variables");
   process.exit(1);
@@ -36,6 +42,329 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let hasNotifiedCookieError = false;
+
+// ====================================================================
+// Discord Notification Helpers
+// ====================================================================
+
+/**
+ * ส่งข้อความหรือ Embed ไปยัง Discord ผ่าน REST API (Bot Token) หรือ Webhook URL
+ */
+async function sendDiscordMessage(payload) {
+  const isBot = DISCORD_BOT_TOKEN && DISCORD_ADMIN_CHANNEL_ID;
+  const isWebhook = !!DISCORD_WEBHOOK_URL;
+
+  if (!isBot && !isWebhook) {
+    return false;
+  }
+
+  try {
+    let targetUrl;
+    const headers = { "Content-Type": "application/json" };
+
+    if (isBot) {
+      targetUrl = `https://discord.com/api/v10/channels/${DISCORD_ADMIN_CHANNEL_ID}/messages`;
+      headers["Authorization"] = `Bot ${DISCORD_BOT_TOKEN.replace(/^Bot\s+/i, "")}`;
+    } else {
+      targetUrl = DISCORD_WEBHOOK_URL;
+    }
+
+    const resp = await fetch(targetUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.warn(`⚠️ ส่ง Discord ไม่สำเร็จ (HTTP ${resp.status}):`, errText);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn("⚠️ เกิดข้อผิดพลาดขณะส่ง Discord notification:", err.message);
+    return false;
+  }
+}
+
+/**
+ * ส่ง Embeds ไปยัง Discord (แบ่งเป็นชุดสูงสุด 10 embeds ต่อ 1 message ตามข้อกำหนดของ Discord)
+ */
+async function sendDiscordEmbeds(embeds) {
+  if (!embeds || embeds.length === 0) return;
+  for (let i = 0; i < embeds.length; i += 10) {
+    const chunk = embeds.slice(i, i + 10);
+    await sendDiscordMessage({ embeds: chunk });
+    if (i + 10 < embeds.length) await sleep(1000);
+  }
+}
+
+/**
+ * จัดรูปแบบระยะเวลาเล่น (วินาที -> มม:วว)
+ */
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return "-";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s < 10 ? "0" : ""}${s}`;
+}
+
+/**
+ * จัดรูปแบบเวลาเป็นภาษาไทย โซนเวลา Asia/Bangkok
+ */
+function formatBangkokTime(isoString) {
+  if (!isoString) return "-";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return d.toLocaleString("th-TH", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (e) {
+    return isoString;
+  }
+}
+
+/**
+ * สร้าง Embed แจ้งเตือนคะแนนรายบุคคล (รองรับคะแนนใหม่, อัปเดต, และ 25,000 Perfect Score)
+ */
+function createScoreEmbed(challenge, week, player, isUpdate = false, oldScore = null) {
+  const is25k = Number(player.total) === 25000;
+  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
+  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
+  const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
+
+  let title, color;
+  if (is25k) {
+    title = `🌟 PERFECT SCORE! 25,000 แต้มเต็ม!`;
+    color = 0xF1C40F; // Gold
+  } else if (isUpdate) {
+    title = `🔄 มีการอัปเดตคะแนน`;
+    color = 0xE67E22; // Orange
+  } else {
+    title = `🎮 คะแนนใหม่เข้ามา!`;
+    color = 0x2ECC71; // Emerald Green
+  }
+
+  const scoreText =
+    isUpdate && oldScore !== null
+      ? `**${Number(player.total).toLocaleString()}** / 25,000 (เดิม ${Number(oldScore).toLocaleString()})`
+      : `**${Number(player.total).toLocaleString()}** / 25,000`;
+
+  const fields = [
+    { name: "👤 ผู้เล่น", value: `**${player.username}**`, inline: true },
+    { name: "⭐ คะแนนรวม", value: scoreText, inline: true },
+    {
+      name: "⏱️ เวลาที่ใช้",
+      value: player.totalTime ? `⚡ ${formatDuration(player.totalTime)}` : "-",
+      inline: true,
+    },
+    {
+      name: "📊 แต่ละรอบ (R1 - R5)",
+      value: `\`${Number(player.r1).toLocaleString()}\` • \`${Number(player.r2).toLocaleString()}\` • \`${Number(player.r3).toLocaleString()}\` • \`${Number(player.r4).toLocaleString()}\` • \`${Number(player.r5).toLocaleString()}\``,
+      inline: false,
+    },
+    { name: "🕒 เวลาที่เล่น", value: formatBangkokTime(player.playedAt), inline: true },
+    { name: "🔗 Challenge", value: `[เปิดเล่นด่านนี้](${challengeUrl})`, inline: true },
+  ];
+
+  return {
+    title: `${title} — ${mapTitle}${modeText}`,
+    url: challengeUrl,
+    color,
+    fields,
+    footer: {
+      text: `GeoGuessr Weekly Challenge • ${week.title}`,
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * สร้าง Embed สรุปกรณีมีผู้เล่นใหม่เข้ามาหลายคนพร้อมกันใน Seed เดียว
+ */
+function createBatchNewScoresEmbed(challenge, week, players) {
+  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
+  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
+  const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
+
+  const playerLines = players
+    .map((p) => {
+      const timeStr = p.totalTime ? ` • ⏱️ ${formatDuration(p.totalTime)}` : "";
+      return `• **${p.username}**: \`${Number(p.total).toLocaleString()} pts\`${timeStr}`;
+    })
+    .join("\n");
+
+  return {
+    title: `🎮 มีผู้เล่นใหม่ ${players.length} คนใน ${mapTitle}${modeText}`,
+    url: challengeUrl,
+    color: 0x3498DB, // Blue
+    description: playerLines.length > 3900 ? playerLines.substring(0, 3900) + "\n..." : playerLines,
+    fields: [
+      { name: "🔗 Challenge", value: `[เปิดเล่นด่านนี้](${challengeUrl})`, inline: true },
+    ],
+    footer: {
+      text: `GeoGuessr Weekly Challenge • ${week.title}`,
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * สร้าง Embed สรุปการซิงค์รอบแรกกรณีนำเข้า Seed ที่มีคนเล่นอยู่แล้วจำนวนมาก
+ */
+function createInitialImportEmbed(challenge, week, totalPlayers) {
+  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
+  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
+  const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
+
+  return {
+    title: `📥 นำเข้าผลคะแนนเริ่มต้น ${mapTitle}${modeText}`,
+    url: challengeUrl,
+    color: 0x34495E, // Slate
+    description: `ระบบได้ทำการเชื่อมต่อและดึงคะแนนเริ่มต้นของผู้เล่นเรียบร้อยแล้ว (**${totalPlayers} คน**)`,
+    fields: [
+      { name: "🔗 Challenge", value: `[เปิดเล่นด่านนี้](${challengeUrl})`, inline: true },
+    ],
+    footer: {
+      text: `GeoGuessr Weekly Challenge • ${week.title}`,
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * ส่งการแจ้งเตือนผลการเปลี่ยนแปลงคะแนนไปยัง Discord
+ */
+async function notifyScoreChanges(challenge, week, newPlayers, updatedPlayers, isInitialImport) {
+  const isDiscordConfigured =
+    DISCORD_WEBHOOK_URL || (DISCORD_BOT_TOKEN && DISCORD_ADMIN_CHANNEL_ID);
+
+  if (!isDiscordConfigured) return;
+  if (newPlayers.length === 0 && updatedPlayers.length === 0) return;
+
+  const embeds = [];
+
+  // แยกคะแนน 25,000 เพื่อสร้างการ์ดทองเด่นพิเศษเสมอ
+  const perfect25k = [];
+  const normalNew = [];
+
+  for (const p of newPlayers) {
+    if (Number(p.total) === 25000) {
+      perfect25k.push(p);
+    } else {
+      normalNew.push(p);
+    }
+  }
+
+  // 1. การ์ดทอง 25,000 แต้มเต็ม
+  for (const p of perfect25k) {
+    embeds.push(createScoreEmbed(challenge, week, p, false, null));
+  }
+
+  // 2. การ์ดคนเล่นใหม่
+  if (normalNew.length > 0) {
+    if (isInitialImport) {
+      // หากเป็นการซิงค์รอบแรกที่มีคนเล่นมากกว่า 5 คน ให้สรุปเป็นการ์ดเดียว
+      embeds.push(createInitialImportEmbed(challenge, week, newPlayers.length));
+    } else if (normalNew.length <= 4) {
+      // 1-4 คน ส่งการ์ดละเอียดรายบุคคล
+      for (const p of normalNew) {
+        embeds.push(createScoreEmbed(challenge, week, p, false, null));
+      }
+    } else {
+      // มากกว่า 4 คน ส่งการ์ดสรุปรายการ
+      embeds.push(createBatchNewScoresEmbed(challenge, week, normalNew));
+    }
+  }
+
+  // 3. การ์ดคนที่มีการอัปเดตคะแนน
+  for (const p of updatedPlayers) {
+    embeds.push(createScoreEmbed(challenge, week, p, true, p.oldScore));
+  }
+
+  if (embeds.length > 0) {
+    console.log(`     📢 กำลังส่งแจ้งเตือน Discord (${embeds.length} embeds)...`);
+    await sendDiscordEmbeds(embeds);
+  }
+}
+
+/**
+ * ส่งสรุปผลการ Freeze สัปดาห์ไปยัง Discord (Podium 1st, 2nd, 3rd)
+ */
+async function sendWeekFreezeSummary(week, challenges) {
+  const isDiscordConfigured =
+    DISCORD_WEBHOOK_URL || (DISCORD_BOT_TOKEN && DISCORD_ADMIN_CHANNEL_ID);
+
+  if (!isDiscordConfigured) return;
+
+  try {
+    const challengeIds = challenges.map((c) => c.id);
+    const { data: scores, error } = await supabase
+      .from("scores")
+      .select("player_id, total_score, players(id, username)")
+      .in("challenge_id", challengeIds);
+
+    if (error || !scores || scores.length === 0) return;
+
+    const playerTotals = {};
+    for (const s of scores) {
+      const pid = s.player_id;
+      const uname = s.players?.username || "Anonymous";
+      if (!playerTotals[pid]) {
+        playerTotals[pid] = { username: uname, totalRaw: 0, mapsPlayed: 0 };
+      }
+      playerTotals[pid].totalRaw += Number(s.total_score) || 0;
+      playerTotals[pid].mapsPlayed += 1;
+    }
+
+    const sortedPlayers = Object.values(playerTotals).sort((a, b) => b.totalRaw - a.totalRaw);
+    const totalParticipants = sortedPlayers.length;
+
+    const medals = ["🥇", "🥈", "🥉"];
+    const topLines = sortedPlayers
+      .slice(0, 5)
+      .map((p, idx) => {
+        const medal = medals[idx] || `**#${idx + 1}**`;
+        return `${medal} **${p.username}** — \`${Number(p.totalRaw).toLocaleString()}\` แต้ม (${p.mapsPlayed}/${challenges.length} maps)`;
+      })
+      .join("\n");
+
+    const embed = {
+      title: `🏆 ปิดรอบการแข่งขันสัปดาห์: ${week.title}!`,
+      description: `❄️ สัปดาห์นี้ถึงกำหนดส่งผลและถูก **Freeze** สรุปคะแนนเรียบร้อยแล้ว!\n\n**Top Leaderboard (คะแนนดิบรวม):**\n${topLines}`,
+      color: 0x9B59B6, // Purple
+      fields: [
+        { name: "👥 ผู้เข้าร่วมทั้งหมด", value: `**${totalParticipants}** คน`, inline: true },
+        { name: "🗺️ จำนวนด่าน", value: `**${challenges.length}** Seeds`, inline: true },
+      ],
+      footer: {
+        text: `GeoGuessr Weekly Challenge • Auto Freeze Summary`,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    await sendDiscordMessage({ embeds: [embed] });
+    console.log(`     📢 ส่งสรุปผลการ Freeze สัปดาห์ "${week.title}" ไปยัง Discord สำเร็จ`);
+  } catch (err) {
+    console.warn("⚠️ ไม่สามารถส่งสรุปผลการ Freeze สัปดาห์ไปยัง Discord:", err.message);
+  }
+}
+
+// ====================================================================
+// GeoGuessr API Fetcher
+// ====================================================================
 
 /**
  * ดึงผลลัพธ์ Challenge ทั้งหมดจาก GeoGuessr API (พร้อมรองรับ Pagination)
@@ -69,18 +398,25 @@ async function fetchChallengeResults(token) {
 
       if (!resp.ok) {
         console.warn(`⚠️ ดึง token ${token} ไม่สำเร็จ (HTTP ${resp.status})`);
+        if ((resp.status === 401 || resp.status === 403) && !hasNotifiedCookieError) {
+          hasNotifiedCookieError = true;
+          await sendDiscordMessage({
+            embeds: [
+              {
+                title: "🚨 แจ้งเตือน: GeoGuessr Cookie หมดอายุ!",
+                description: `ระบบ Sync ไม่สามารถดึงคะแนนได้เนื่องจากติดสิทธิ์ **HTTP ${resp.status} Unauthorized/Forbidden**\n\nโปรดเข้าเว็บ GeoGuessr เพื่อคัดลอก Cookie ค่า \`_ncfa\` ใหม่ แล้วนำไปอัปเดตใน **GitHub Secrets** (\`GEOGUESSR_COOKIE\`) เพื่อให้ระบบสามารถดึงคะแนนต่อได้`,
+                color: 0xE74C3C, // Red
+                footer: { text: "GeoGuessr Weekly Challenge • Sync Alert" },
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          });
+        }
         break;
       }
 
       const data = await resp.json();
       const items = Array.isArray(data?.items) ? data.items : [];
-
-      if (page === 0 && items.length > 0) {
-        console.log(`     🔍 [GeoGuessr Data Sample] Keys in item:`, Object.keys(items[0]));
-        if (items[0].game) console.log(`     🔍 [GeoGuessr Data Sample] Keys in item.game:`, Object.keys(items[0].game));
-        if (items[0].game?.player) console.log(`     🔍 [GeoGuessr Data Sample] Keys in item.game.player:`, Object.keys(items[0].game.player));
-        if (items[0].game?.player?.guesses?.[0]) console.log(`     🔍 [GeoGuessr Data Sample] Keys in guess[0]:`, Object.keys(items[0].game.player.guesses[0]));
-      }
 
       for (const item of items) {
         const userId = String(item.userId || item.game?.player?.id || "").trim();
@@ -169,11 +505,21 @@ async function fetchChallengeResults(token) {
   return players;
 }
 
-/**
- * ฟังก์ชันหลักในการซิงค์ข้อมูล
- */
+// ====================================================================
+// ฟังก์ชันหลักในการซิงค์ข้อมูล
+// ====================================================================
+
 async function main() {
   console.log("🚀 เริ่มต้นกระบวนการ Sync คะแนน GeoGuessr Weekly Challenge...");
+  const isDiscordActive =
+    DISCORD_WEBHOOK_URL || (DISCORD_BOT_TOKEN && DISCORD_ADMIN_CHANNEL_ID);
+  if (isDiscordActive) {
+    console.log(
+      `🔔 ระบบ Discord Alert เปิดใช้งาน (${DISCORD_BOT_TOKEN ? "Bot Token" : "Webhook"})`
+    );
+  } else {
+    console.log("ℹ️ ระบบ Discord Alert ยังไม่ได้ตั้งค่า (จะทำงานเฉพาะบันทึกฐานข้อมูล)");
+  }
 
   // 1. ดึงสัปดาห์ที่ยังไม่ Freeze (is_frozen = false)
   const { data: activeWeeks, error: weekError } = await supabase
@@ -211,6 +557,7 @@ async function main() {
       if (shouldFreeze) {
         await supabase.from("weeks").update({ is_frozen: true }).eq("id", week.id);
         console.log(`❄️ ทำการ Freeze สัปดาห์ ${week.title} เรียบร้อย`);
+        await sendWeekFreezeSummary(week, []);
       }
       continue;
     }
@@ -254,13 +601,47 @@ async function main() {
               }
             });
             if (adjustedCount > 0) {
-              console.log(`     🎯 ใช้กฎปรับคะแนน Round ${adj.round_number} (${adj.rule_type}): อัปเดต ${adjustedCount} คน`);
+              console.log(
+                `     🎯 ใช้กฎปรับคะแนน Round ${adj.round_number} (${adj.rule_type}): อัปเดต ${adjustedCount} คน`
+              );
             }
           }
         }
       } catch (adjErr) {
         // ข้ามอย่างปลอดภัยหากยังไม่ได้สร้างตาราง score_adjustments
       }
+
+      // ดึงคะแนนเดิมที่มีในฐานข้อมูลเพื่อเปรียบเทียบหาคะแนนใหม่ / มีการอัปเดต
+      let existingScores = [];
+      try {
+        const { data: exScores } = await supabase
+          .from("scores")
+          .select("player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time")
+          .eq("challenge_id", challenge.id);
+        existingScores = exScores || [];
+      } catch (exErr) {
+        console.warn("     ⚠️ ดึง existing scores ไม่สำเร็จ:", exErr.message);
+      }
+
+      const existingMap = new Map();
+      for (const s of existingScores) {
+        existingMap.set(s.player_id, s);
+      }
+
+      // ตรวจหาคะแนนใหม่และคะแนนที่เปลี่ยนแปลง
+      const newPlayers = [];
+      const updatedPlayers = [];
+
+      for (const r of results) {
+        const existing = existingMap.get(r.userId);
+        if (!existing) {
+          newPlayers.push(r);
+        } else if (Number(existing.total_score) !== Number(r.total)) {
+          updatedPlayers.push({ ...r, oldScore: existing.total_score });
+        }
+      }
+
+      const isInitialImport = existingMap.size === 0 && results.length > 5;
 
       // 1. บันทึก / อัปเดตข้อมูลผู้เล่นลงตาราง players
       const playerUpserts = results.map((r) => ({
@@ -298,7 +679,12 @@ async function main() {
         .upsert(scoreUpserts, { onConflict: "challenge_id,player_id" });
 
       // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ played_at หรือ total_time ให้บันทึกแบบเดิมไม่ให้พัง
-      if (sErr && (sErr.message?.includes("played_at") || sErr.message?.includes("total_time") || sErr.code === "PGRST204")) {
+      if (
+        sErr &&
+        (sErr.message?.includes("played_at") ||
+          sErr.message?.includes("total_time") ||
+          sErr.code === "PGRST204")
+      ) {
         console.warn("     ℹ️ ตาราง scores ยังไม่มีคอลัมน์ played_at / total_time (ลองบันทึกเฉพาะคะแนนแบบเดิม)...");
         const fallbackUpserts = scoreUpserts.map(({ played_at, total_time, ...rest }) => rest);
         const { error: fbErr } = await supabase
@@ -308,6 +694,9 @@ async function main() {
       } else if (sErr) {
         console.warn("     ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
       }
+
+      // 3. ส่งการแจ้งเตือนไปยัง Discord เมื่อมีคะแนนใหม่หรือมีการอัปเดต
+      await notifyScoreChanges(challenge, week, newPlayers, updatedPlayers, isInitialImport);
     }
 
     // อัปเดตเวลา Last Update ของสัปดาห์นี้
@@ -320,14 +709,27 @@ async function main() {
     if (shouldFreeze) {
       await supabase.from("weeks").update({ is_frozen: true }).eq("id", week.id);
       console.log(`❄️ ถึงเวลาตัดรอบแล้ว: ทำการ Freeze สัปดาห์ "${week.title}" สำเร็จ!`);
+      await sendWeekFreezeSummary(week, challenges);
     }
   }
 
   console.log("\n✅ สิ้นสุดกระบวนการ Sync คะแนนเรียบร้อยแล้ว!");
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error("❌ Fatal Error:", err);
+  try {
+    await sendDiscordMessage({
+      embeds: [
+        {
+          title: "❌ เกิดข้อผิดพลาดร้ายแรงในระบบ Sync!",
+          description: `พบ Fatal Error ขณะรันกระบวนการ Sync:\n\`\`\`${String(err.message || err).substring(0, 1500)}\`\`\``,
+          color: 0xE74C3C,
+          footer: { text: "GeoGuessr Weekly Challenge • Sync Failure Alert" },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+  } catch (notifyErr) {}
   process.exit(1);
 });
-

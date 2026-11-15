@@ -4,7 +4,8 @@
   "description": "GeoGuessr Weekly Challenge Tracker & Sync Worker",
   "main": "sync.js",
   "scripts": {
-    "sync": "node sync.js"
+    "sync": "node sync.js",
+    "test-discord": "node test-discord.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
