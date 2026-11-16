@@ -2,13 +2,20 @@ name: GeoGuessr Weekly Challenge Auto Sync
 
 on:
   schedule:
-    # รันอัตโนมัติทุก 30 นาที
-    - cron: "*/30 * * * *"
+    # รันอัตโนมัติทุก 30 นาที (ใช้นาทีที่ 17 และ 47 เพื่อเลี่ยงคิวมหาชนตอนต้นชั่วโมงและครึ่งชั่วโมง)
+    - cron: "17,47 * * * *"
   workflow_dispatch: # อนุญาตให้กดสั่งรันด้วยมือผ่านหน้าเว็บ GitHub ได้ตลอดเวลา
+
+# ป้องกันคิวค้างซ้อน: หากมีรอบใหม่เข้ามา ให้ยกเลิกรอบเก่าที่กำลังค้างอยู่ทันที
+concurrency:
+  group: sync-scores
+  cancel-in-progress: true
 
 jobs:
   sync-scores:
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # ตัดจบงานทันทีหากค้างเกิน 5 นาที ป้องกันการกินโควตาและค้างคิว
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
