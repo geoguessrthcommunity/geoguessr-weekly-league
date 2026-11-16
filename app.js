@@ -546,9 +546,19 @@ function computeWeekStandings(challenges, scores) {
       // 3. Rank in map (ptsMap descending, raw total as tie breaker)
       pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
 
+      // Calculate max raw score in each round for this challenge (R1..R5)
+      const maxRounds = [0, 1, 2, 3, 4].map((m) => Math.max(...pList.map((p) => p.raw[m])));
+
       pList.forEach((p, idx) => {
         const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
         p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
+
+        let roundWins = 0;
+        for (let m = 0; m < 5; m++) {
+          if (p.raw[m] === maxRounds[m] && maxRounds[m] > 0) {
+            roundWins++;
+          }
+        }
 
         resultMap.set(p.userId, {
           userId: p.userId,
@@ -562,6 +572,9 @@ function computeWeekStandings(challenges, scores) {
           points: p.points,
           h2h: p.h2h,
           ptsRounds: p.ptsRounds,
+          maxRounds: maxRounds,
+          roundWins: roundWins,
+          isMapWin: p.mapRank === 1,
         });
       });
     }
@@ -1070,6 +1083,8 @@ window.openPlayerProfile = async function (userId) {
   const statSeasonPts = document.getElementById("statSeasonPts");
   const statWeeksPlayed = document.getElementById("statWeeksPlayed");
   const statPodiums = document.getElementById("statPodiums");
+  const statMapWins = document.getElementById("statMapWins");
+  const statRoundWins = document.getElementById("statRoundWins");
   const stat5kRounds = document.getElementById("stat5kRounds");
   const stat25kGames = document.getElementById("stat25kGames");
   const modalHistoryTableBody = document.getElementById("modalHistoryTableBody");
@@ -1117,6 +1132,8 @@ window.openPlayerProfile = async function (userId) {
     statPodiums.textContent = podiumsStr;
 
     if (userScores.length === 0) {
+      if (statMapWins) statMapWins.textContent = "0";
+      if (statRoundWins) statRoundWins.textContent = "0";
       stat5kRounds.textContent = "0";
       stat25kGames.textContent = "0";
       statWeeksPlayed.textContent = "0";
@@ -1132,6 +1149,8 @@ window.openPlayerProfile = async function (userId) {
 
     let count5k = 0;
     let count25k = 0;
+    let countMapWins = 0;
+    let countRoundWins = 0;
     const uniqueWeeks = new Set();
 
     userScores.forEach((s) => {
@@ -1140,8 +1159,17 @@ window.openPlayerProfile = async function (userId) {
       });
       if (s.total_score === 25000) count25k++;
       if (s.challenges?.week_id) uniqueWeeks.add(s.challenges.week_id);
+
+      const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(s.challenges?.week_id);
+      const mapRes = wkStandings?.mapResults?.get(s.challenge_id)?.get(userId);
+      if (mapRes) {
+        if (mapRes.isMapWin) countMapWins++;
+        countRoundWins += mapRes.roundWins || 0;
+      }
     });
 
+    if (statMapWins) statMapWins.textContent = countMapWins.toLocaleString();
+    if (statRoundWins) statRoundWins.textContent = countRoundWins.toLocaleString();
     stat5kRounds.textContent = count5k.toLocaleString();
     stat25kGames.textContent = count25k.toLocaleString();
     statWeeksPlayed.textContent = uniqueWeeks.size.toLocaleString();
@@ -1173,6 +1201,15 @@ window.openPlayerProfile = async function (userId) {
           rankCls = getRankClass(mapRes.rank);
         }
 
+        const maxR = mapRes?.maxRounds || [];
+        const renderR = (val, idx) => {
+          const isWin = maxR[idx] !== undefined && val === maxR[idx] && maxR[idx] > 0;
+          if (isWin) {
+            return `<span style="font-weight: 700; color: #15803d;" title="Round ${idx + 1} Best Score in this seed!">★ ${formatNum(val)}</span>`;
+          }
+          return formatNum(val);
+        };
+
         return `
           <tr>
             <td style="font-weight: 600; color: #475569;">${escapeHtml(wk.title || `W${ch.week_id}`)}</td>
@@ -1180,11 +1217,11 @@ window.openPlayerProfile = async function (userId) {
               <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))}
             </td>
             <td><span class="mode-tag ${modeInfo.cls}">${modeInfo.label}</span></td>
-            <td>${formatNum(s.r1)}</td>
-            <td>${formatNum(s.r2)}</td>
-            <td>${formatNum(s.r3)}</td>
-            <td>${formatNum(s.r4)}</td>
-            <td>${formatNum(s.r5)}</td>
+            <td>${renderR(s.r1, 0)}</td>
+            <td>${renderR(s.r2, 1)}</td>
+            <td>${renderR(s.r3, 2)}</td>
+            <td>${renderR(s.r4, 3)}</td>
+            <td>${renderR(s.r5, 4)}</td>
             <td style="background: #eff6ff; font-weight: 700; color: #1e3a8a;">${formatNum(total)}</td>
             <td style="background: #00247d; color: white; font-weight: 700;">${ptsMapDisplay}</td>
             <td class="${rankCls}">${rankMapDisplay}</td>

@@ -1278,6 +1278,85 @@ window.deleteAdjustment = async function (adjId) {
 // ==========================================
 let allDirectoryPlayers = [];
 
+// ==========================================
+// ฟังก์ชันช่วยคำนวณการจัดอันดับและผู้ชนะรายแมพ/รายรอบ (Helper for Map Wins & Round Wins)
+// ==========================================
+function computeMapRankings(pScores) {
+  if (!pScores || pScores.length === 0) return new Map();
+
+  const pList = pScores.map((s) => ({
+    userId: s.player_id,
+    raw: [
+      Number(s.r1) || 0,
+      Number(s.r2) || 0,
+      Number(s.r3) || 0,
+      Number(s.r4) || 0,
+      Number(s.r5) || 0,
+      Number(s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0))) || 0,
+    ],
+    phantoms: [],
+    points: [],
+  }));
+
+  const maxRounds = [0, 1, 2, 3, 4].map((m) => Math.max(...pList.map((p) => p.raw[m])));
+
+  for (let m = 0; m < 6; m++) {
+    const maxScore = m < 5 ? 5000 : 25000;
+    pList.forEach((p) => {
+      const raw = p.raw[m];
+      const missing = Math.max(0, maxScore - raw);
+      p.phantoms[m] = raw + 0.1 * missing;
+    });
+
+    pList.forEach((p, i) => {
+      let pts = 0;
+      const pRaw = p.raw[m];
+      const pPhan = p.phantoms[m];
+
+      pList.forEach((opp, j) => {
+        if (i === j) return;
+        const oppRaw = opp.raw[m];
+        const oppPhan = opp.phantoms[m];
+
+        if (pRaw > oppPhan && oppRaw <= pPhan) {
+          pts += 1;
+        } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
+          pts += 0.5;
+        }
+      });
+      p.points[m] = pts;
+    });
+  }
+
+  pList.forEach((p) => {
+    p.ptsMap = Math.round(p.points.reduce((a, b) => a + b, 0));
+  });
+
+  pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+
+  const resultMap = new Map();
+  pList.forEach((p, idx) => {
+    const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
+    p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
+
+    let roundWins = 0;
+    for (let m = 0; m < 5; m++) {
+      if (p.raw[m] === maxRounds[m] && maxRounds[m] > 0) {
+        roundWins++;
+      }
+    }
+
+    resultMap.set(p.userId, {
+      mapRank: p.mapRank,
+      isMapWin: p.mapRank === 1,
+      roundWins: roundWins,
+      maxRounds: maxRounds,
+    });
+  });
+
+  return resultMap;
+}
+
 window.openPlayerDirectoryModal = async function () {
   const modal = document.getElementById("playerDirectoryModal");
   document.getElementById("playerDirSearchInput").value = "";
@@ -1292,7 +1371,7 @@ window.closePlayerDirectoryModal = function () {
 async function loadPlayerDirectory() {
   if (!adminDb) return;
   const tbody = document.getElementById("playerDirTableBody");
-  tbody.innerHTML = `<tr><td colspan="7" style="padding: 24px; text-align: center; color: #64748b;">⏳ กำลังโหลดรายชื่อผู้เล่น...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="9" style="padding: 24px; text-align: center; color: #64748b;">⏳ กำลังโหลดรายชื่อผู้เล่น...</td></tr>`;
 
   try {
     const { data: players, error: pErr } = await adminDb
@@ -1306,14 +1385,25 @@ async function loadPlayerDirectory() {
 
     const { data: scores, error: scErr } = await adminDb
       .from("scores")
-      .select("player_id, r1, r2, r3, r4, r5, total_score");
+      .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score");
 
     if (scErr) throw scErr;
+
+    const scoresByChallenge = new Map();
+    (scores || []).forEach((s) => {
+      if (!scoresByChallenge.has(s.challenge_id)) scoresByChallenge.set(s.challenge_id, []);
+      scoresByChallenge.get(s.challenge_id).push(s);
+    });
+
+    const challengeRankingsMap = new Map();
+    scoresByChallenge.forEach((chScores, chId) => {
+      challengeRankingsMap.set(chId, computeMapRankings(chScores));
+    });
 
     const statsMap = new Map();
     (scores || []).forEach((s) => {
       if (!statsMap.has(s.player_id)) {
-        statsMap.set(s.player_id, { maps: 0, count5k: 0, count25k: 0 });
+        statsMap.set(s.player_id, { maps: 0, count5k: 0, count25k: 0, mapWins: 0, roundWins: 0 });
       }
       const st = statsMap.get(s.player_id);
       st.maps++;
@@ -1321,16 +1411,23 @@ async function loadPlayerDirectory() {
         if (r === 5000) st.count5k++;
       });
       if (s.total_score === 25000) st.count25k++;
+
+      const chMap = challengeRankingsMap.get(s.challenge_id);
+      const rInfo = chMap?.get(s.player_id);
+      if (rInfo) {
+        if (rInfo.isMapWin) st.mapWins++;
+        st.roundWins += rInfo.roundWins;
+      }
     });
 
     allDirectoryPlayers.forEach((p) => {
-      p.stats = statsMap.get(p.id) || { maps: 0, count5k: 0, count25k: 0 };
+      p.stats = statsMap.get(p.id) || { maps: 0, count5k: 0, count25k: 0, mapWins: 0, roundWins: 0 };
     });
 
     renderPlayerDirectoryList();
   } catch (err) {
     console.error("Load player directory error:", err);
-    tbody.innerHTML = `<tr><td colspan="7" style="padding: 24px; text-align: center; color: red;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="padding: 24px; text-align: center; color: red;">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -1344,18 +1441,27 @@ window.renderPlayerDirectoryList = function () {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">ไม่พบผู้เล่นที่ค้นหา</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="padding: 24px; text-align: center; color: #94a3b8;">ไม่พบผู้เล่นที่ค้นหา</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered
     .map((p, idx) => {
+      const mapWinsTag = p.stats.mapWins > 0 
+        ? `<span style="font-weight: 800; color: #b45309;">${p.stats.mapWins} 🥇</span>` 
+        : `<span style="color: #94a3b8;">0</span>`;
+      const roundWinsTag = p.stats.roundWins > 0 
+        ? `<span style="font-weight: 800; color: #0284c7;">${p.stats.roundWins} 🎯</span>` 
+        : `<span style="color: #94a3b8;">0</span>`;
+
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="text-align: center; color: #64748b;">${idx + 1}</td>
           <td style="text-align: left; padding: 8px 12px; font-weight: bold; color: #00247d;">${escapeHtml(p.username)}</td>
           <td style="text-align: center; font-family: monospace; font-size: 0.78rem; color: #64748b;">${escapeHtml(p.id)}</td>
           <td style="text-align: center;">${p.stats.maps} แมพ</td>
+          <td style="text-align: center;">${mapWinsTag}</td>
+          <td style="text-align: center;">${roundWinsTag}</td>
           <td style="text-align: center; font-weight: bold; color: #16a34a;">${p.stats.count5k}</td>
           <td style="text-align: center; font-weight: bold; color: #b45309;">${p.stats.count25k}</td>
           <td style="text-align: center;">
@@ -1377,6 +1483,8 @@ window.openAdminPlayerProfile = async function (playerId) {
   const geoguessrLink = document.getElementById("admProfGeoguessrLink");
   const weeksPlayedEl = document.getElementById("admProfWeeksPlayed");
   const totalMapsEl = document.getElementById("admProfTotalMaps");
+  const mapWinsEl = document.getElementById("admProfMapWins");
+  const roundWinsEl = document.getElementById("admProfRoundWins");
   const count5kEl = document.getElementById("admProf5kRounds");
   const count25kEl = document.getElementById("admProf25kGames");
   const tbody = document.getElementById("admProfHistoryTableBody");
@@ -1400,8 +1508,31 @@ window.openAdminPlayerProfile = async function (playerId) {
     const username = allScores[0]?.players?.username || "Player";
     usernameEl.textContent = username;
 
+    // Fetch all scores for the challenges this player participated in to compute Map Wins & Round Wins accurately
+    const chIds = [...new Set(allScores.map((s) => s.challenge_id))];
+    const chRankingsMap = new Map();
+
+    if (chIds.length > 0) {
+      const { data: relatedScores } = await adminDb
+        .from("scores")
+        .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score")
+        .in("challenge_id", chIds);
+
+      const byCh = new Map();
+      (relatedScores || []).forEach((s) => {
+        if (!byCh.has(s.challenge_id)) byCh.set(s.challenge_id, []);
+        byCh.get(s.challenge_id).push(s);
+      });
+
+      byCh.forEach((scoresList, cId) => {
+        chRankingsMap.set(cId, computeMapRankings(scoresList));
+      });
+    }
+
     let count5k = 0;
     let count25k = 0;
+    let countMapWins = 0;
+    let countRoundWins = 0;
     const uniqueWeeks = new Set();
 
     allScores.forEach((s) => {
@@ -1410,10 +1541,18 @@ window.openAdminPlayerProfile = async function (playerId) {
       });
       if (s.total_score === 25000) count25k++;
       if (s.challenges?.week_id) uniqueWeeks.add(s.challenges.week_id);
+
+      const chRank = chRankingsMap.get(s.challenge_id)?.get(playerId);
+      if (chRank) {
+        if (chRank.isMapWin) countMapWins++;
+        countRoundWins += chRank.roundWins || 0;
+      }
     });
 
     weeksPlayedEl.textContent = uniqueWeeks.size;
     totalMapsEl.textContent = allScores.length;
+    if (mapWinsEl) mapWinsEl.textContent = countMapWins.toLocaleString();
+    if (roundWinsEl) roundWinsEl.textContent = countRoundWins.toLocaleString();
     count5kEl.textContent = count5k.toLocaleString();
     count25kEl.textContent = count25k.toLocaleString();
 
@@ -1439,20 +1578,33 @@ window.openAdminPlayerProfile = async function (playerId) {
           ? `<span style="font-size: 0.7rem; background: #e0f2fe; color: #0369a1; padding: 1px 4px; border-radius: 3px;">Frozen</span>`
           : `<span style="font-size: 0.7rem; background: #fef3c7; color: #b45309; padding: 1px 4px; border-radius: 3px;">Live</span>`;
 
+        const chRank = chRankingsMap.get(s.challenge_id)?.get(playerId);
+        const maxR = chRank?.maxRounds || [];
+
+        const renderR = (val, idx) => {
+          const isWin = maxR[idx] !== undefined && val === maxR[idx] && maxR[idx] > 0;
+          if (isWin) {
+            return `<strong style="color: #15803d;" title="Round ${idx + 1} Best Score!">★ ${(val ?? 0).toLocaleString()}</strong>`;
+          }
+          return (val ?? 0).toLocaleString();
+        };
+
+        const mapWinBadge = chRank?.isMapWin ? `<span style="margin-left: 4px;" title="อันดับ 1 ของแมพนี้!">🥇</span>` : "";
+
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
             <td style="font-weight: 600; color: #475569;">
               ${escapeHtml(wk.title || `W${ch.week_id}`)} ${statusTag}
             </td>
             <td style="text-align: left; padding-left: 10px;">
-              <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))}
+              <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))} ${mapWinBadge}
             </td>
             <td><span class="mode-tag ${modeInfo.cls}">${modeInfo.label}</span></td>
-            <td>${(s.r1 ?? 0).toLocaleString()}</td>
-            <td>${(s.r2 ?? 0).toLocaleString()}</td>
-            <td>${(s.r3 ?? 0).toLocaleString()}</td>
-            <td>${(s.r4 ?? 0).toLocaleString()}</td>
-            <td>${(s.r5 ?? 0).toLocaleString()}</td>
+            <td>${renderR(s.r1, 0)}</td>
+            <td>${renderR(s.r2, 1)}</td>
+            <td>${renderR(s.r3, 2)}</td>
+            <td>${renderR(s.r4, 3)}</td>
+            <td>${renderR(s.r5, 4)}</td>
             <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">${total.toLocaleString()}</td>
           </tr>
         `;

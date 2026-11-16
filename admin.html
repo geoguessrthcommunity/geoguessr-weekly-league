@@ -702,7 +702,7 @@
 
   <!-- 7. Modal รายชื่อผู้เล่นทั้งหมด & สถิติ (Player Directory) -->
   <div id="playerDirectoryModal" class="modal-backdrop">
-    <div class="edit-modal-box" style="max-width: 920px;">
+    <div class="edit-modal-box" style="max-width: 960px;">
       <div
         style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
@@ -733,13 +733,15 @@
         <table class="rules-table" style="margin: 0; font-size: 0.85rem; width: 100%; border-collapse: collapse;">
           <thead>
             <tr style="background: #f1f5f9;">
-              <th style="width: 50px;">#</th>
+              <th style="width: 45px;">#</th>
               <th style="text-align: left; padding: 8px 12px;">ชื่อผู้เล่น (Pseudo)</th>
-              <th style="width: 190px;">GeoGuessr User ID</th>
-              <th style="width: 90px;">แมพที่เล่น</th>
-              <th style="width: 90px; color: #15803d;">5K Rounds</th>
-              <th style="width: 90px; color: #b45309;">25K Games</th>
-              <th style="width: 120px;">สถิติเจาะลึก</th>
+              <th style="width: 170px;">GeoGuessr User ID</th>
+              <th style="width: 80px;">แมพที่เล่น</th>
+              <th style="width: 90px; color: #b45309;">Map Wins 🥇</th>
+              <th style="width: 95px; color: #0284c7;">Round Wins 🎯</th>
+              <th style="width: 85px; color: #15803d;">5K Rounds</th>
+              <th style="width: 85px; color: #b45309;">25K Games</th>
+              <th style="width: 110px;">สถิติเจาะลึก</th>
             </tr>
           </thead>
           <tbody id="playerDirTableBody">
@@ -756,7 +758,7 @@
 
   <!-- 8. Modal สถิติเจาะลึกผู้เล่นสำหรับแอดมิน (Admin Player Profile - All Weeks) -->
   <div id="adminPlayerModal" class="modal-backdrop" style="z-index: 2200;">
-    <div class="edit-modal-box" style="max-width: 860px;">
+    <div class="edit-modal-box" style="max-width: 880px;">
       <div
         style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 16px;">
         <div>
@@ -775,7 +777,7 @@
       </div>
 
       <!-- Stat Highlights Cards -->
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px;">
         <div
           style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #64748b; font-weight: bold;">WEEKS PLAYED</div>
@@ -785,6 +787,16 @@
           style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
           <div style="font-size: 0.75rem; color: #64748b; font-weight: bold;">TOTAL MAPS</div>
           <div id="admProfTotalMaps" style="font-size: 1.25rem; font-weight: 800; color: #00247d;">-</div>
+        </div>
+        <div
+          style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px; text-align: center;">
+          <div style="font-size: 0.75rem; color: #b45309; font-weight: bold;">MAP WINS 🥇</div>
+          <div id="admProfMapWins" style="font-size: 1.25rem; font-weight: 800; color: #d97706;">-</div>
+        </div>
+        <div
+          style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px; text-align: center;">
+          <div style="font-size: 0.75rem; color: #0369a1; font-weight: bold;">ROUND WINS 🎯</div>
+          <div id="admProfRoundWins" style="font-size: 1.25rem; font-weight: 800; color: #0284c7;">-</div>
         </div>
         <div
           style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;">
