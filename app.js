@@ -98,10 +98,47 @@ async function init() {
       return;
     }
 
-    allWeeks = weeks;
+    // Filter to show ONLY Active (Present) and Frozen (Past) weeks to players
+    // Hide Draft / Scheduled future weeks from viewers completely
+    const now = new Date();
+    const visibleWeeks = weeks.filter((w) => {
+      if (w.is_frozen) return true; // Past competition is always visible
+      if (w.is_active) {
+        if (w.start_date && new Date(w.start_date) > now) {
+          return false; // Scheduled for future, not started yet
+        }
+        return true; // Ongoing active competition
+      }
+      return false; // Draft / upcoming week
+    });
+
+    if (visibleWeeks.length === 0) {
+      scoresTableBody.innerHTML = `
+        <tr>
+          <td colspan="17" style="padding: 50px 20px; text-align: center; color: #64748b;">
+            <div style="font-size: 2.2rem; margin-bottom: 10px;">⏳</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+              การแข่งขันรอบถัดไปกำลังจะเริ่มเร็ว ๆ นี้ (Coming Soon)
+            </div>
+            <div style="font-size: 0.85rem; color: #64748b;">
+              ยังไม่มีสัปดาห์การแข่งขันที่เปิดให้เล่นในขณะนี้ กรุณาติดตามประกาศกำหนดการเปิดแข่งอีกครั้ง
+            </div>
+          </td>
+        </tr>
+      `;
+      if (bannerTitle) bannerTitle.textContent = "🏆 GeoGuessr Weekly Challenge";
+      if (bannerSubInfo) bannerSubInfo.textContent = "⏳ Next Week Coming Soon";
+      if (countdownBadge) countdownBadge.style.display = "none";
+      if (mapsGrid) mapsGrid.innerHTML = "";
+      allWeeks = [];
+      renderBottomTabs();
+      return;
+    }
+
+    allWeeks = visibleWeeks;
     renderBottomTabs();
 
-    const defaultWeek = weeks.find((w) => w.is_active) || weeks[0];
+    const defaultWeek = allWeeks.find((w) => w.is_active) || allWeeks[0];
     await selectWeek(defaultWeek.id);
 
     // Setup Supabase Realtime Listener (debounced)
@@ -385,15 +422,18 @@ function renderMapCards(challenges) {
 
   mapsGrid.innerHTML = challenges
     .map((c) => {
+      const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
       return `
       <div class="map-card">
         <div>
           <div class="map-title">Map ${c.seed_number}</div>
           <div class="map-desc">${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}</div>
         </div>
-        <a href="${c.url}" target="_blank" rel="noopener noreferrer" class="map-btn">
-          ▶ Play
-        </a>
+        ${
+          hasUrl
+            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn">▶ Play</a>`
+            : `<span class="map-btn" style="opacity: 0.55; cursor: not-allowed; background: #64748b; font-size: 0.8rem;">🔒 Soon</span>`
+        }
       </div>
     `;
     })
@@ -424,7 +464,7 @@ function renderTableHeaders(challenges) {
   `;
 
   challenges.forEach((c) => {
-    const playUrl = c.url || "#";
+    const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
     const mapName = c.name || `Seed ${c.seed_number}`;
 
     tableTopHeaderRow.insertAdjacentHTML(
@@ -436,9 +476,11 @@ function renderTableHeaders(challenges) {
             <div class="map-card-title">Map ${c.seed_number}</div>
             <div class="map-card-desc">${renderFlags(escapeHtml(mapName))}</div>
           </div>
-          <a href="${escapeHtml(playUrl)}" target="_blank" rel="noopener noreferrer" class="map-btn">
-            ▶ Play
-          </a>
+          ${
+            hasUrl
+              ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn">▶ Play</a>`
+              : `<span class="map-btn" style="opacity: 0.55; cursor: not-allowed; background: #64748b; font-size: 0.75rem;">🔒 Soon</span>`
+          }
         </div>
       </th>
     `

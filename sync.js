@@ -341,13 +341,16 @@ async function sendWeekFreezeSummary(week, challenges) {
       })
       .join("\n");
 
+    const activeChallengesCount = (challenges || []).filter((c) => c.token && c.token.trim() !== "").length;
+    const totalMapsCount = activeChallengesCount > 0 ? activeChallengesCount : challenges.length;
+
     const embed = {
       title: `🏆 ปิดรอบการแข่งขันสัปดาห์: ${week.title}!`,
       description: `❄️ สัปดาห์นี้ถึงกำหนดส่งผลและถูก **Freeze** สรุปคะแนนเรียบร้อยแล้ว!\n\n**Top Leaderboard (คะแนนดิบรวม):**\n${topLines}`,
       color: 0x9B59B6, // Purple
       fields: [
         { name: "👥 ผู้เข้าร่วมทั้งหมด", value: `**${totalParticipants}** คน`, inline: true },
-        { name: "🗺️ จำนวนด่าน", value: `**${challenges.length}** Seeds`, inline: true },
+        { name: "🗺️ จำนวนด่าน", value: `**${totalMapsCount}** Seeds`, inline: true },
       ],
       footer: {
         text: `GeoGuessr Weekly Challenge • Auto Freeze Summary`,
@@ -521,8 +524,8 @@ async function main() {
     console.log("ℹ️ ระบบ Discord Alert ยังไม่ได้ตั้งค่า (จะทำงานเฉพาะบันทึกฐานข้อมูล)");
   }
 
-  // 1. ดึงสัปดาห์ที่ยังไม่ Freeze (is_frozen = false)
-  const { data: activeWeeks, error: weekError } = await supabase
+  // 1. ดึงสัปดาห์ทั้งหมดที่ยังไม่ Freeze (is_frozen = false)
+  const { data: nonFrozenWeeks, error: weekError } = await supabase
     .from("weeks")
     .select("*")
     .eq("is_frozen", false);
@@ -532,12 +535,34 @@ async function main() {
     process.exit(1);
   }
 
-  if (!activeWeeks || activeWeeks.length === 0) {
+  if (!nonFrozenWeeks || nonFrozenWeeks.length === 0) {
     console.log("ℹ️ ไม่มีสัปดาห์ที่กำลังแข่งขันอยู่ (ทุกสัปดาห์ Freeze หมดแล้ว)");
     return;
   }
 
   const now = new Date();
+
+  // ตรวจสอบ Auto-Activate สำหรับสัปดาห์ที่กำหนด start_date ไว้ และถึงเวลาเริ่มแล้ว
+  for (const week of nonFrozenWeeks) {
+    if (!week.is_active && week.start_date && now >= new Date(week.start_date)) {
+      console.log(`🚀 ถึงเวลาเริ่มการแข่งขัน! กำลังเปิดใช้งานอัตโนมัติ: ${week.title} (ID: ${week.id})`);
+      await supabase.from("weeks").update({ is_active: false }).neq("id", week.id);
+      await supabase.from("weeks").update({ is_active: true }).eq("id", week.id);
+      week.is_active = true;
+    }
+  }
+
+  // ดึงเฉพาะสัปดาห์ที่ Active และถึงเวลาเริ่มแล้วจริง ๆ เพื่อดึงคะแนน
+  const activeWeeks = nonFrozenWeeks.filter((w) => {
+    if (!w.is_active) return false;
+    if (w.start_date && now < new Date(w.start_date)) return false;
+    return true;
+  });
+
+  if (activeWeeks.length === 0) {
+    console.log("ℹ️ ไม่มีสัปดาห์ที่เปิดการแข่งขันอยู่ในขณะนี้ (สัปดาห์ที่เหลือเป็น Draft หรือยังไม่ถึงเวลาเริ่ม)");
+    return;
+  }
 
   for (const week of activeWeeks) {
     console.log(`\n📌 กำลังตรวจสอบสัปดาห์: ${week.title} (ID: ${week.id})`);
@@ -571,6 +596,11 @@ async function main() {
     const pendingNotifications = [];
 
     for (const challenge of challenges) {
+      if (!challenge.token || challenge.token.trim() === "") {
+        console.log(`  -> Seed ${challenge.seed_number}: ยังไม่มี Token/ลิงก์ Challenge (ข้าม)`);
+        continue;
+      }
+
       console.log(`  -> กำลังดึง Seed ${challenge.seed_number} (Token: ${challenge.token})...`);
       const results = await fetchChallengeResults(challenge.token);
       console.log(`     ได้ข้อมูลผู้เล่นครบ 5 รอบ: ${results.length} คน`);

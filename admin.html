@@ -293,71 +293,94 @@
               placeholder="เช่น แข่งขัน 10 - 17 พ.ย. || ปิดรับคะแนนวันที่ 17 เวลา 20:00 น.">
           </div>
 
-          <div class="form-group">
-            <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
-            <input type="datetime-local" id="weekEndDate">
-            <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง หรือเช็กปี ค.ศ.
-              ให้ถูกต้อง)</small>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label>วัน-เวลาเริ่มต้นการแข่งขัน (Start Date):</label>
+              <input type="datetime-local" id="weekStartDate">
+              <small style="color: #64748b;">(เว้นว่างได้ หรือกำหนดวันเปิดแข่งล่วงหน้า)</small>
+            </div>
+
+            <div class="form-group">
+              <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
+              <input type="datetime-local" id="weekEndDate">
+              <small style="color: #64748b;">(เว้นว่างไว้ได้หากต้องการมากดปุ่ม Freeze ด้วยตัวเอง)</small>
+            </div>
           </div>
 
-          <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ กรอกข้อมูลทั้ง 7 Maps:
-          </h3>
+          <div class="form-group" style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 14px; border-radius: 6px; margin: 12px 0;">
+            <label style="margin-bottom: 6px; font-weight: bold; color: var(--navy-primary); display: block;">สถานะเริ่มต้นของสัปดาห์นี้:</label>
+            <div style="display: flex; gap: 20px; align-items: center; font-size: 0.9rem; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="weekInitialStatus" value="draft" checked>
+                <span>🗓️ <strong>บันทึกเป็นแบบร่าง (Draft / Upcoming)</strong> <small style="color: #64748b;">(คนดูยังไม่เห็น)</small></span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="weekInitialStatus" value="active">
+                <span>🟢 <strong>เปิดแข่งขันทันที (Active Now)</strong> <small style="color: #16a34a;">(แสดงหน้าแรกให้คนเล่นทันที)</small></span>
+              </label>
+            </div>
+          </div>
+
+          <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 6px 0;">🗺️ ข้อมูลทั้ง 7 Maps:</h3>
+          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">
+            💡 <em>สามารถเว้นว่างลิงก์ไว้ก่อนได้หากยังไม่ได้สร้าง Challenge ใน GeoGuessr เมื่อสร้างเสร็จค่อยมากดปุ่ม "✏️ แก้ไขข้อมูล" เพื่อเติมลิงก์ภายหลัง</em>
+          </p>
 
           <div id="mapsInputsContainer">
             <div class="map-row">
               <strong>Map 1:</strong>
               <input type="text" class="map-name-input" data-seed="1"
-                placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น Europe | Move 3')">
               <input type="text" class="map-url-input" data-seed="1"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 2:</strong>
               <input type="text" class="map-name-input" data-seed="2"
-                placeholder="ชื่อแมพ & โหมด (เช่น Asia | No move 2')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น Asia | No move 2')">
               <input type="text" class="map-url-input" data-seed="2"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 3:</strong>
               <input type="text" class="map-name-input" data-seed="3"
-                placeholder="ชื่อแมพ & โหมด (เช่น Americas | NM 2')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น Americas | NM 2')">
               <input type="text" class="map-url-input" data-seed="3"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 4:</strong>
               <input type="text" class="map-name-input" data-seed="4"
-                placeholder="ชื่อแมพ & โหมด (เช่น Africa | Move 3')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น Africa | Move 3')">
               <input type="text" class="map-url-input" data-seed="4"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 5:</strong>
               <input type="text" class="map-name-input" data-seed="5"
-                placeholder="ชื่อแมพ & โหมด (เช่น World | Move 3')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น World | Move 3')">
               <input type="text" class="map-url-input" data-seed="5"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 6:</strong>
               <input type="text" class="map-name-input" data-seed="6"
-                placeholder="ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')">
               <input type="text" class="map-url-input" data-seed="6"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
             <div class="map-row">
               <strong>Map 7:</strong>
               <input type="text" class="map-name-input" data-seed="7"
-                placeholder="ชื่อแมพ & โหมด (เช่น AI Community | NM 2')" required>
+                placeholder="ชื่อแมพ & โหมด (เช่น AI Community | NM 2')">
               <input type="text" class="map-url-input" data-seed="7"
-                placeholder="ลิงก์ Challenge: https://www.geoguessr.com/challenge/..." required>
+                placeholder="ลิงก์ Challenge (เว้นว่างไว้ก่อนได้)">
             </div>
           </div>
 
           <button type="submit" class="btn"
             style="margin-top: 16px; width: 100%; padding: 12px; font-size: 1rem; justify-content: center; background: var(--thai-red);">
-            🚀 บันทึกและเปิดสัปดาห์แข่งขันใหม่
+            💾 บันทึกสัปดาห์แข่งขัน (Save Week)
           </button>
         </form>
       </div>
@@ -387,19 +410,31 @@
           <input type="text" id="editWeekHeaderInfo">
         </div>
 
-        <div class="form-group">
-          <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
-          <div style="display: flex; gap: 10px;">
-            <input type="datetime-local" id="editWeekEndDate">
-            <button type="button" class="btn" style="background: #64748b;"
-              onclick="document.getElementById('editWeekEndDate').value=''">ล้างวันตัดรอบ</button>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label>วัน-เวลาเริ่มต้นการแข่งขัน (Start Date):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="datetime-local" id="editWeekStartDate">
+              <button type="button" class="btn" style="background: #64748b; padding: 4px 8px; font-size: 0.8rem;"
+                onclick="document.getElementById('editWeekStartDate').value=''">ล้าง</button>
+            </div>
           </div>
-          <small style="color: #64748b;">(ถ้าล้างวันตัดรอบ ระบบจะไม่ Freeze อัตโนมัติ จนกว่าคุณจะมากดปุ่ม Freeze
-            เอง)</small>
+
+          <div class="form-group">
+            <label>วัน-เวลาตัดรอบอัตโนมัติ (End Date / Schedule Freeze):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="datetime-local" id="editWeekEndDate">
+              <button type="button" class="btn" style="background: #64748b; padding: 4px 8px; font-size: 0.8rem;"
+                onclick="document.getElementById('editWeekEndDate').value=''">ล้าง</button>
+            </div>
+            <small style="color: #64748b;">(ถ้าล้างวันตัดรอบ ระบบจะไม่ Freeze อัตโนมัติ)</small>
+          </div>
         </div>
 
-        <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 10px 0;">🗺️ แก้ไขรายชื่อและลิงก์ทั้ง
-          7 Maps:</h3>
+        <h3 style="font-size: 1.05rem; color: var(--navy-primary); margin: 20px 0 6px 0;">🗺️ แก้ไขรายชื่อและลิงก์ทั้ง 7 Maps:</h3>
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">
+          💡 <em>หากด่านไหนยังไม่มี Challenge สามารถเว้นว่างลิงก์ไว้ได้ ระบบจะยังไม่เปิดปุ่มเล่นในหน้านั้น</em>
+        </p>
         <div id="editMapsContainer">
           <!-- จะถูกสร้างผ่าน JS ทั้ง 7 แถว -->
         </div>

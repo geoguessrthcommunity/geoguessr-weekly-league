@@ -126,21 +126,47 @@ async function loadWeeks() {
 
   weeksList.innerHTML = weeks
     .map((w) => {
-      const activeTag = w.is_active ? `<span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold;">⭐️ สัปดาห์ปัจจุบัน (Active)</span>` : "";
-      const frozenTag = w.is_frozen
-        ? `<span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold;">❄️ Freeze แล้ว</span>`
-        : `<span style="background: #fef3c7; color: #b45309; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold;">🟢 กำลังแข่ง</span>`;
+      let statusTag = "";
+      if (w.is_frozen) {
+        statusTag = `<span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold;">❄️ Freeze แล้ว</span>`;
+      } else if (w.is_active) {
+        statusTag = `<span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold;">🟢 กำลังแข่ง (Active)</span>`;
+      } else {
+        statusTag = `<span style="background: #f1f5f9; color: #475569; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; border: 1px solid #cbd5e1;">🗓️ แบบร่าง / ล่วงหน้า (Draft)</span>`;
+      }
 
-      let endDateStr = "ไม่ได้กำหนด (แมนนวล)";
+      let dateInfoHtml = "";
+      if (w.start_date) {
+        const sd = new Date(w.start_date);
+        dateInfoHtml += `<div style="font-size: 0.8rem; color: #64748b;">วันเริ่ม: <strong>${sd.toLocaleDateString("th-TH")} ${sd.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</strong></div>`;
+      }
       if (w.end_date) {
-        const d = new Date(w.end_date);
-        endDateStr = `${d.toLocaleDateString("th-TH")} ${d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`;
+        const ed = new Date(w.end_date);
+        dateInfoHtml += `<div style="font-size: 0.8rem; color: #64748b;">วันตัดรอบ: <strong>${ed.toLocaleDateString("th-TH")} ${ed.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</strong></div>`;
+      } else {
+        dateInfoHtml += `<div style="font-size: 0.8rem; color: #64748b;">วันตัดรอบ: <strong>ไม่ได้กำหนด (แมนนวล)</strong></div>`;
       }
 
       const challengesList = (w.challenges || [])
         .sort((a, b) => a.seed_number - b.seed_number)
-        .map((c) => `<span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${c.seed_number}: ${renderFlags(escapeHtml(c.name || c.token))}</span>`)
+        .map((c) => {
+          const hasLink = c.token && c.token.trim() !== "";
+          const bg = hasLink ? "#e2e8f0" : "#fee2e2";
+          const color = hasLink ? "#1e293b" : "#991b1b";
+          const linkIcon = hasLink ? "🔗" : "⚠️ ไม่มีลิงก์";
+          return `<span style="background: ${bg}; color: ${color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))} (${linkIcon})</span>`;
+        })
         .join(" ");
+
+      let actionButtons = "";
+      if (w.is_frozen) {
+        actionButtons += `<button class="btn btn-unfreeze" onclick="toggleFreeze(${w.id}, false)">🔓 ปลด Freeze (เปิดแข่งต่อ)</button>`;
+      } else if (w.is_active) {
+        actionButtons += `<button class="btn" style="background: #eab308; color: #0f172a;" onclick="setDraftWeek(${w.id})">⏸️ พักเป็นแบบร่าง</button>`;
+        actionButtons += `<button class="btn btn-freeze" onclick="toggleFreeze(${w.id}, true)">❄️ Freeze ทันที</button>`;
+      } else {
+        actionButtons += `<button class="btn" style="background: #16a34a; color: white;" onclick="setActiveWeek(${w.id})">🚀 เปิดแข่งขันทันที (Set Active)</button>`;
+      }
 
       return `
         <div class="week-card-item">
@@ -148,28 +174,18 @@ async function loadWeeks() {
             <div>
               <strong style="font-size: 1.15rem; color: #0f172a;">${escapeHtml(w.title)}</strong>
               <div style="font-size: 0.85rem; color: #475569; margin: 4px 0;">${escapeHtml(w.header_info || "(ไม่มีข้อความหัวเว็บ)")}</div>
-              <div style="font-size: 0.8rem; color: #64748b;">วันตัดรอบ: <strong>${endDateStr}</strong></div>
+              ${dateInfoHtml}
               <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
-                ${frozenTag}
-                ${activeTag}
+                ${statusTag}
               </div>
             </div>
             
             <div class="week-actions">
-              ${
-                w.is_frozen
-                  ? `<button class="btn btn-unfreeze" onclick="toggleFreeze(${w.id}, false)">🔓 ปลด Freeze (เปิดแข่งต่อ)</button>`
-                  : `<button class="btn btn-freeze" onclick="toggleFreeze(${w.id}, true)">❄️ Freeze ทันที</button>`
-              }
+              ${actionButtons}
               <button class="btn" style="background: #0284c7; color: white;" onclick="openScoresModal(${w.id}, '${escapeHtml(w.title)}')">📊 จัดการคะแนน</button>
               <button class="btn" style="background: #0d9488; color: white;" onclick="openMapInspectorModal(${w.id}, '${escapeHtml(w.title)}')">🧮 ตรวจการคิดคะแนน</button>
               <button class="btn" style="background: #7c3aed; color: white;" onclick="openAdjustmentsModal(${w.id}, '${escapeHtml(w.title)}')">🛠️ กฎคะแนนพิเศษ</button>
               <button class="btn btn-edit" onclick="openEditModal(${w.id})">✏️ แก้ไขข้อมูล & 7 Maps</button>
-              ${
-                !w.is_active
-                  ? `<button class="btn" style="background: #475569;" onclick="setActiveWeek(${w.id})">⭐️ ตั้งเป็นหน้าแรก</button>`
-                  : ""
-              }
               <button class="btn btn-danger" onclick="deleteWeek(${w.id}, '${escapeHtml(w.title)}')">🗑️ ลบ</button>
             </div>
           </div>
@@ -235,6 +251,18 @@ window.openEditModal = async function (weekId) {
     editWeekEndDate.value = "";
   }
 
+  // แปลง start_date เป็น format สำหรับ input datetime-local
+  const editStartDateInput = document.getElementById("editWeekStartDate");
+  if (editStartDateInput) {
+    if (week.start_date) {
+      const sd = new Date(week.start_date);
+      sd.setMinutes(sd.getMinutes() - sd.getTimezoneOffset());
+      editStartDateInput.value = sd.toISOString().slice(0, 16);
+    } else {
+      editStartDateInput.value = "";
+    }
+  }
+
   // เตรียมข้อมูล 7 Maps
   const challenges = (week.challenges || []).sort((a, b) => a.seed_number - b.seed_number);
   
@@ -244,8 +272,8 @@ window.openEditModal = async function (weekId) {
       return `
         <div class="map-row">
           <strong>Map ${seedNum}:</strong>
-          <input type="text" class="edit-map-name" data-seed="${seedNum}" placeholder="ชื่อแมพ & โหมด" value="${escapeHtml(ch.name || "")}" required>
-          <input type="text" class="edit-map-url" data-seed="${seedNum}" placeholder="ลิงก์ Challenge" value="${escapeHtml(ch.url || (ch.token ? `https://www.geoguessr.com/challenge/${ch.token}` : ""))}" required>
+          <input type="text" class="edit-map-name" data-seed="${seedNum}" placeholder="ชื่อแมพ & โหมด (เว้นว่างได้)" value="${escapeHtml(ch.name || "")}">
+          <input type="text" class="edit-map-url" data-seed="${seedNum}" placeholder="ลิงก์ Challenge (เว้นว่างได้)" value="${escapeHtml(ch.url || (ch.token ? `https://www.geoguessr.com/challenge/${ch.token}` : ""))}">
         </div>
       `;
     })
@@ -266,6 +294,9 @@ editWeekForm.addEventListener("submit", async (e) => {
   const weekId = Number(editWeekId.value);
   const title = editWeekTitle.value.trim();
   const headerInfo = editWeekHeaderInfo.value.trim();
+  const startDateInput = document.getElementById("editWeekStartDate");
+  const startDateVal = startDateInput ? startDateInput.value : null;
+  const startDate = startDateVal ? new Date(startDateVal).toISOString() : null;
   const endDateVal = editWeekEndDate.value;
   const endDate = endDateVal ? new Date(endDateVal).toISOString() : null;
 
@@ -277,19 +308,22 @@ editWeekForm.addEventListener("submit", async (e) => {
     const seedNum = i + 1;
     const name = nameInputs[i].value.trim();
     const rawUrl = urlInputs[i].value.trim();
-    const token = extractToken(rawUrl);
+    let token = "";
 
-    if (!token) {
-      alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง`);
-      return;
+    if (rawUrl) {
+      token = extractToken(rawUrl);
+      if (!token) {
+        alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง (หากยังไม่มีลิงก์ ให้เว้นว่างไว้ก่อนได้)`);
+        return;
+      }
     }
 
     challengesToUpsert.push({
       week_id: weekId,
       seed_number: seedNum,
-      name: name || `Map ${seedNum}`,
-      token: token,
-      url: rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`,
+      name: name || (token ? `Map ${seedNum}` : `Map ${seedNum} (TBD)`),
+      token: token || "",
+      url: token ? (rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`) : "",
     });
   }
 
@@ -352,6 +386,7 @@ editWeekForm.addEventListener("submit", async (e) => {
       .update({
         title,
         header_info: headerInfo,
+        start_date: startDate,
         end_date: endDate,
         updated_at: new Date().toISOString(),
       })
@@ -391,8 +426,11 @@ createWeekForm.addEventListener("submit", async (e) => {
 
   const title = document.getElementById("weekTitle").value.trim();
   const headerInfo = document.getElementById("weekHeaderInfo").value.trim();
+  const startDateVal = document.getElementById("weekStartDate")?.value;
+  const startDate = startDateVal ? new Date(startDateVal).toISOString() : null;
   const endDateVal = document.getElementById("weekEndDate").value;
   const endDate = endDateVal ? new Date(endDateVal).toISOString() : null;
+  const isInitialActive = document.querySelector('input[name="weekInitialStatus"]:checked')?.value === "active";
 
   const mapNameInputs = document.querySelectorAll(".map-name-input");
   const mapUrlInputs = document.querySelectorAll(".map-url-input");
@@ -402,24 +440,29 @@ createWeekForm.addEventListener("submit", async (e) => {
     const seedNum = i + 1;
     const name = mapNameInputs[i].value.trim();
     const rawUrl = mapUrlInputs[i].value.trim();
-    const token = extractToken(rawUrl);
+    let token = "";
 
-    if (!token) {
-      alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง`);
-      return;
+    if (rawUrl) {
+      token = extractToken(rawUrl);
+      if (!token) {
+        alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง (หากยังไม่มีลิงก์ ให้เว้นว่างไว้ก่อนได้)`);
+        return;
+      }
     }
 
     challengesData.push({
       seed_number: seedNum,
-      name: name || `Map ${seedNum}`,
-      token: token,
-      url: rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`,
+      name: name || (token ? `Map ${seedNum}` : `Map ${seedNum} (TBD)`),
+      token: token || "",
+      url: token ? (rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`) : "",
     });
   }
 
   try {
-    // 1. ตั้งสัปดาห์อื่น ๆ เป็น is_active = false
-    await adminDb.from("weeks").update({ is_active: false }).neq("id", 0);
+    // 1. ถ้าเลือกเป็น Active ตอนสร้าง ให้ตั้งสัปดาห์อื่น ๆ เป็น is_active = false
+    if (isInitialActive) {
+      await adminDb.from("weeks").update({ is_active: false }).neq("id", 0);
+    }
 
     // 2. สร้างสัปดาห์ใหม่
     const { data: newWeek, error: wErr } = await adminDb
@@ -427,8 +470,9 @@ createWeekForm.addEventListener("submit", async (e) => {
       .insert({
         title,
         header_info: headerInfo,
+        start_date: startDate,
         end_date: endDate,
-        is_active: true,
+        is_active: isInitialActive,
         is_frozen: false,
       })
       .select()
@@ -448,19 +492,31 @@ createWeekForm.addEventListener("submit", async (e) => {
     const { error: chErr } = await adminDb.from("challenges").insert(challengesToInsert);
     if (chErr) throw chErr;
 
-    alert(`✅ สร้างสัปดาห์ "${title}" พร้อม 7 Maps สำเร็จแล้ว!`);
+    alert(`✅ สร้างสัปดาห์ "${title}" ${isInitialActive ? "(เปิดแข่งทันที)" : "(บันทึกเป็นแบบร่าง)"} สำเร็จแล้ว!`);
     createWeekForm.reset();
     loadWeeks();
   } catch (err) {
     console.error("Error creating week:", err);
-    alert("เกิดข้อผิดพลาด: " + err.message);
+    alert("เกิดข้อผิดพลาดในการสร้างสัปดาห์: " + (err.message || err));
   }
 });
 
 window.setActiveWeek = async function (id) {
   if (!adminDb) return;
+  if (!confirm("ต้องการเปิดสัปดาห์นี้ให้เป็น 'สัปดาห์ปัจจุบัน (Active)' และแสดงบนหน้าแรกทันทีใช่หรือไม่?")) {
+    return;
+  }
   await adminDb.from("weeks").update({ is_active: false }).neq("id", 0);
   await adminDb.from("weeks").update({ is_active: true }).eq("id", id);
+  loadWeeks();
+};
+
+window.setDraftWeek = async function (id) {
+  if (!adminDb) return;
+  if (!confirm("ต้องการเปลี่ยนสถานะสัปดาห์นี้ให้เป็น 'แบบร่าง (Draft)' หรือไม่?\n\n(คนดูในหน้าแรกจะไม่เห็นสัปดาห์นี้ จนกว่าคุณจะกดเปิดแข่งขันอีกครั้ง)")) {
+    return;
+  }
+  await adminDb.from("weeks").update({ is_active: false }).eq("id", id);
   loadWeeks();
 };
 

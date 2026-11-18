@@ -1,0 +1,16 @@
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+GEOGUESSR_COOKIE=_ncfa=your-cookie-value-here
+BOT_USER_ID=optional-bot-geoguessr-user-id
+
+# ====================================================================
+# การตั้งค่า Discord Notification Alert สำหรับแอดมิน (เลือกแบบใดแบบหนึ่ง)
+# ====================================================================
+
+# แบบที่ 1: Discord Webhook URL (ง่ายที่สุด ทำได้ใน 10 วินาที)
+# สร้างได้ที่: ห้อง Discord -> Edit Channel -> Integrations -> Webhooks -> New Webhook
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
+
+# แบบที่ 2: Discord Bot Token + Channel ID (ส่งในนาม Avatar และชื่อบอทของคุณเอง)
+# DISCORD_BOT_TOKEN=your-discord-bot-token-here
+# DISCORD_ADMIN_CHANNEL_ID=your-admin-channel-id-here
