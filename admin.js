@@ -119,6 +119,20 @@ function getGameType(c) {
   return c?.game_type || "standard";
 }
 
+async function fetchAllRows(buildQueryFn, pageSize = 1000, maxPages = 100) {
+  const all = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await buildQueryFn().range(from, to);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
 function sortChallenges(list) {
   return [...(list || [])].sort(
     (a, b) => getMapNum(a) - getMapNum(b) || getSubSeedNum(a) - getSubSeedNum(b)
@@ -815,16 +829,22 @@ async function loadScoresForWeek(weekId) {
     const chIds = currentWeekChallenges.map((c) => c.id);
 
     // 2. ดึงคะแนนทั้งหมดของ Challenges ในสัปดาห์นี้ พร้อมข้อมูล players, played_at, total_time
-    let { data: scores, error: scErr } = await adminDb
-      .from("scores")
-      .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time, updated_at, players(id, username)")
-      .in("challenge_id", chIds);
+    let { data: scores, error: scErr } = await fetchAllRows(() =>
+      adminDb
+        .from("scores")
+        .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time, updated_at, players(id, username)")
+        .in("challenge_id", chIds)
+        .order("id", { ascending: true })
+    );
 
     if (scErr && (scErr.message?.includes("played_at") || scErr.code === "PGRST204")) {
-      const fb = await adminDb
-        .from("scores")
-        .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, updated_at, players(id, username)")
-        .in("challenge_id", chIds);
+      const fb = await fetchAllRows(() =>
+        adminDb
+          .from("scores")
+          .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, updated_at, players(id, username)")
+          .in("challenge_id", chIds)
+          .order("id", { ascending: true })
+      );
       scores = fb.data;
       scErr = fb.error;
     }
@@ -1296,10 +1316,12 @@ window.triggerForceSync = async function () {
 window.exportMasterCSV = async function () {
   if (!adminDb) return;
   try {
-    const { data: scores, error } = await adminDb
-      .from("scores")
-      .select("*, challenges(*, weeks(*)), players(username)")
-      .order("id", { ascending: false });
+    const { data: scores, error } = await fetchAllRows(() =>
+      adminDb
+        .from("scores")
+        .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, updated_at, challenges(seed_number, map_number, sub_seed_number, game_type, name, weeks(title, is_frozen)), players(username)")
+        .order("id", { ascending: false })
+    );
 
     if (error) throw error;
     if (!scores || scores.length === 0) {
@@ -1754,25 +1776,34 @@ async function loadPlayerDirectory() {
   tbody.innerHTML = `<tr><td colspan="9" style="padding: 24px; text-align: center; color: #64748b;">⏳ กำลังโหลดรายชื่อผู้เล่น...</td></tr>`;
 
   try {
-    const { data: players, error: pErr } = await adminDb
-      .from("players")
-      .select("*")
-      .order("username", { ascending: true });
+    const { data: players, error: pErr } = await fetchAllRows(() =>
+      adminDb
+        .from("players")
+        .select("id, username, updated_at")
+        .order("username", { ascending: true })
+        .order("id", { ascending: true })
+    );
 
     if (pErr) throw pErr;
     allDirectoryPlayers = players || [];
     document.getElementById("playerDirTotalCount").textContent = allDirectoryPlayers.length;
 
-    const { data: challengesMeta } = await adminDb
-      .from("challenges")
-      .select("id, game_type");
+    const { data: challengesMeta } = await fetchAllRows(() =>
+      adminDb
+        .from("challenges")
+        .select("id, game_type")
+        .order("id", { ascending: true })
+    );
 
     const chTypeMap = new Map();
     (challengesMeta || []).forEach((c) => chTypeMap.set(c.id, getGameType(c)));
 
-    const { data: scores, error: scErr } = await adminDb
-      .from("scores")
-      .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score");
+    const { data: scores, error: scErr } = await fetchAllRows(() =>
+      adminDb
+        .from("scores")
+        .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score")
+        .order("id", { ascending: true })
+    );
 
     if (scErr) throw scErr;
 
@@ -1887,10 +1918,13 @@ window.openAdminPlayerProfile = async function (playerId) {
   modal.classList.add("open");
 
   try {
-    const { data: scores, error: scErr } = await adminDb
-      .from("scores")
-      .select("*, challenges(*, weeks(*)), players(username)")
-      .eq("player_id", playerId);
+    const { data: scores, error: scErr } = await fetchAllRows(() =>
+      adminDb
+        .from("scores")
+        .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, challenges(*, weeks(*)), players(username)")
+        .eq("player_id", playerId)
+        .order("id", { ascending: true })
+    );
 
     if (scErr) throw scErr;
 
@@ -1903,10 +1937,13 @@ window.openAdminPlayerProfile = async function (playerId) {
     const chRankingsMap = new Map();
 
     if (chIds.length > 0) {
-      const { data: relatedScores } = await adminDb
-        .from("scores")
-        .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score")
-        .in("challenge_id", chIds);
+      const { data: relatedScores } = await fetchAllRows(() =>
+        adminDb
+          .from("scores")
+          .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score")
+          .in("challenge_id", chIds)
+          .order("id", { ascending: true })
+      );
 
       const chTypeById = new Map();
       allScores.forEach((s) => {
@@ -2111,10 +2148,38 @@ async function loadAndComputeInspectorData(weekId) {
     inspWeekChallenges = sortChallenges(challenges || []);
 
     const chIds = inspWeekChallenges.map((c) => c.id);
-    let { data: scores, error: scErr } = await adminDb
-      .from("scores")
-      .select("*, players(id, username)")
-      .in("challenge_id", chIds);
+    const hasCountryMap = inspWeekChallenges.some((c) => getGameType(c) === "country_count");
+    const inspCols = hasCountryMap
+      ? "id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, played_at, round_details, players(id, username)"
+      : "id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, played_at, players(id, username)";
+
+    let { data: scores, error: scErr } =
+      chIds.length === 0
+        ? { data: [], error: null }
+        : await fetchAllRows(() =>
+            adminDb
+              .from("scores")
+              .select(inspCols)
+              .in("challenge_id", chIds)
+              .order("id", { ascending: true })
+          );
+
+    if (
+      scErr &&
+      (scErr.message?.includes("played_at") ||
+        scErr.message?.includes("round_details") ||
+        scErr.code === "PGRST204")
+    ) {
+      const fb = await fetchAllRows(() =>
+        adminDb
+          .from("scores")
+          .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, players(id, username)")
+          .in("challenge_id", chIds)
+          .order("id", { ascending: true })
+      );
+      scores = fb.data;
+      scErr = fb.error;
+    }
 
     if (scErr) throw scErr;
     inspWeekScores = scores || [];

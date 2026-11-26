@@ -44,6 +44,20 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function fetchAllRows(buildQueryFn, pageSize = 1000, maxPages = 100) {
+  const all = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await buildQueryFn().range(from, to);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
 let hasNotifiedCookieError = false;
 
 // ====================================================================
@@ -347,10 +361,16 @@ async function sendWeekFreezeSummary(week, challenges) {
 
   try {
     const challengeIds = challenges.map((c) => c.id);
-    const { data: scores, error } = await supabase
-      .from("scores")
-      .select("player_id, total_score, players(id, username)")
-      .in("challenge_id", challengeIds);
+    const { data: scores, error } =
+      challengeIds.length === 0
+        ? { data: [], error: null }
+        : await fetchAllRows(() =>
+            supabase
+              .from("scores")
+              .select("id, player_id, total_score, players(id, username)")
+              .in("challenge_id", challengeIds)
+              .order("id", { ascending: true })
+          );
 
     if (error || !scores || scores.length === 0) return;
 
@@ -732,16 +752,22 @@ async function main() {
       // ดึงคะแนนเดิมที่มีในฐานข้อมูลเพื่อเปรียบเทียบหาคะแนนใหม่ / มีการอัปเดต
       let existingScores = [];
       try {
-        let { data: exScores, error: exErr } = await supabase
-          .from("scores")
-          .select("player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time")
-          .eq("challenge_id", challenge.id);
+        let { data: exScores, error: exErr } = await fetchAllRows(() =>
+          supabase
+            .from("scores")
+            .select("id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time")
+            .eq("challenge_id", challenge.id)
+            .order("id", { ascending: true })
+        );
 
         if (exErr && (exErr.message?.includes("played_at") || exErr.code === "PGRST204")) {
-          const fallback = await supabase
-            .from("scores")
-            .select("player_id, total_score, r1, r2, r3, r4, r5")
-            .eq("challenge_id", challenge.id);
+          const fallback = await fetchAllRows(() =>
+            supabase
+              .from("scores")
+              .select("id, player_id, total_score, r1, r2, r3, r4, r5")
+              .eq("challenge_id", challenge.id)
+              .order("id", { ascending: true })
+          );
           exScores = fallback.data;
         }
         existingScores = exScores || [];

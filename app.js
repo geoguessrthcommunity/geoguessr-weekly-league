@@ -31,6 +31,20 @@ function getGameType(c) {
   return c?.game_type || "standard";
 }
 
+async function fetchAllRows(buildQueryFn, pageSize = 1000, maxPages = 100) {
+  const all = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await buildQueryFn().range(from, to);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return { data: all, error: null };
+}
+
 function sortChallenges(list) {
   return [...(list || [])].sort(
     (a, b) => getMapNum(a) - getMapNum(b) || getSubSeedNum(a) - getSubSeedNum(b)
@@ -284,12 +298,37 @@ async function selectWeek(weekId) {
     return;
   }
 
-  // Load Scores
+  // Load Scores (paginated + lightweight columns)
   const challengeIds = currentChallenges.map((c) => c.id);
-  const { data: scores } = await db
-    .from("scores")
-    .select("*, players(id, username)")
-    .in("challenge_id", challengeIds);
+  const needsRoundDetails =
+    week.is_frozen && currentChallenges.some((c) => getGameType(c) === "country_count");
+  const scoreCols = needsRoundDetails
+    ? "id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, played_at, round_details, players(id, username)"
+    : "id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, played_at, players(id, username)";
+
+  let { data: scores, error: scErr } = await fetchAllRows(() =>
+    db
+      .from("scores")
+      .select(scoreCols)
+      .in("challenge_id", challengeIds)
+      .order("id", { ascending: true })
+  );
+
+  if (
+    scErr &&
+    (scErr.message?.includes("played_at") ||
+      scErr.message?.includes("round_details") ||
+      scErr.code === "PGRST204")
+  ) {
+    const fb = await fetchAllRows(() =>
+      db
+        .from("scores")
+        .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, players(id, username)")
+        .in("challenge_id", challengeIds)
+        .order("id", { ascending: true })
+    );
+    scores = fb.data;
+  }
 
   calculateAndRenderScores(scores || [], currentChallenges);
 
@@ -1324,19 +1363,27 @@ async function loadAndRenderSeasonStandings() {
     }
 
     const frozenWeekIds = frozenWeeks.map((w) => w.id);
-    const { data: challenges, error: chErr } = await db
-      .from("challenges")
-      .select("*")
-      .in("week_id", frozenWeekIds)
-      .order("seed_number", { ascending: true });
+    const { data: challenges, error: chErr } = await fetchAllRows(() =>
+      db
+        .from("challenges")
+        .select("id, week_id, seed_number, map_number, sub_seed_number, game_type, name")
+        .in("week_id", frozenWeekIds)
+        .order("id", { ascending: true })
+    );
 
     if (chErr) throw chErr;
 
     const chIds = (challenges || []).map((c) => c.id);
-    const { data: scores, error: scErr } = await db
-      .from("scores")
-      .select("*, players(id, username)")
-      .in("challenge_id", chIds);
+    const { data: scores, error: scErr } =
+      chIds.length === 0
+        ? { data: [], error: null }
+        : await fetchAllRows(() =>
+            db
+              .from("scores")
+              .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, players(id, username)")
+              .in("challenge_id", chIds)
+              .order("id", { ascending: true })
+          );
 
     if (scErr) throw scErr;
 
@@ -1483,10 +1530,13 @@ window.openPlayerProfile = async function (userId) {
       await loadAndRenderSeasonStandings();
     }
 
-    const { data: scores, error: scErr } = await db
-      .from("scores")
-      .select("*, challenges(*, weeks(*)), players(username)")
-      .eq("player_id", userId);
+    const { data: scores, error: scErr } = await fetchAllRows(() =>
+      db
+        .from("scores")
+        .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, challenges(*, weeks(*)), players(username)")
+        .eq("player_id", userId)
+        .order("id", { ascending: true })
+    );
 
     if (scErr) throw scErr;
 
