@@ -428,6 +428,43 @@
             *หมายเหตุ: ระบบ Phantom Score ช่วยป้องกันความเหลื่อมล้ำจากความคลาดเคลื่อนเพียงระดับพิกเซลหรือเมตร
             ทำให้การแข่งขันยุติธรรมและสนุกยิ่งขึ้น!
           </p>
+
+          <!-- Sub-section: Multi-Seed & Country Count -->
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 2px dashed #e2e8f0;">
+            <h4 style="color: var(--navy-primary); margin: 0 0 10px 0; font-size: 1.02rem;">
+              🔢 กรณีแผนที่มีหลาย Seed (Multi-Seed Maps — เช่น 2 Seeds หรือ 5 Seeds):
+            </h4>
+            <p style="font-size: 0.93rem;">
+              บางสัปดาห์อาจมีบาง Map ที่ประกอบด้วยมากกว่า 1 ลิงก์ (แสดงปุ่ม <strong>▶ Seed 1</strong>, <strong>▶ Seed 2</strong>, ... เรียงลงมาในหัวตาราง) โดยยังคงเล่น 5 รอบต่อ Seed ตามปกติ:
+            </p>
+            <ul style="margin: 6px 0 12px 24px; line-height: 1.75; font-size: 0.92rem;">
+              <li>ระบบจะคำนวณคะแนนของ <strong>แต่ละ Seed แยกกัน</strong> ตามกติกาของ Map นั้น</li>
+              <li>จากนั้นนำคะแนนทุก Seed ของ Map นั้นมารวมกัน แล้ว <strong>หารด้วยจำนวน Seed ทั้งหมดของ Map นั้น</strong> (เช่น 2 Seeds หาร 2, 5 Seeds หาร 5 ปัดทศนิยม 1 ตำแหน่ง) เพื่อไม่ให้คะแนนรวมสัปดาห์เฟ้อเกิน Map อื่น</li>
+              <li><em>หมายเหตุ:</em> หากผู้เล่นเล่นไม่ครบทุก Seed ใน Map นั้น Seed ที่ไม่ได้เล่นจะถูกนับเป็น <strong>0 แต้ม</strong> เมื่อนำไปหารเฉลี่ย</li>
+            </ul>
+
+            <h4 style="color: var(--navy-primary); margin: 16px 0 10px 0; font-size: 1.02rem;">
+              🌍 กติกาโหมดพิเศษ: "Country Count" (นับจำนวนประเทศที่ทายถูก):
+            </h4>
+            <p style="font-size: 0.93rem;">
+              สำหรับ Map ที่ระบุป้าย <strong>🌍 Country</strong> จะตัดสินจาก <strong>การปักหมุดถูกประเทศหรือไม่</strong> แทนคะแนนดิบ 5,000 โดยมีกติกาเฉพาะดังนี้:
+            </p>
+            <ul style="margin: 6px 0 10px 24px; line-height: 1.75; font-size: 0.92rem;">
+              <li><strong>ไม่มี Phantom Score (0%):</strong> เปรียบเทียบกันด้วยผลถูก/ผิดและจำนวนประเทศที่ทายถูกโดยตรง</li>
+              <li><strong>รอบที่ 1 ถึง 5 (R1–R5):</strong> ทายถูกประเทศ = <strong>1</strong>, ทายผิดประเทศ / ปักลงทะเล / หมดเวลา = <strong>0</strong>
+                <br><span style="color: #475569;">&rarr; คนที่ได้ <strong>1 (ทายถูก)</strong>: เทียบ H2H ปกติ (ชนะคนที่ได้ 0 คนละ +1 แต้ม, เสมอคนที่ได้ 1 ด้วยกันคนละ +0.5 แต้ม)</span>
+                <br><span style="color: #b91c1c;">&rarr; คนที่ได้ <strong>0 (ทายผิด)</strong>: ได้ <strong>0 แต้มทันที</strong> ในรอบนั้น (ไม่นับเสมอ 0.5 กับคนที่ทายผิดด้วยกัน)</span>
+              </li>
+              <li><strong>รอบที่ 6 (Total 0–5 ประเทศ):</strong> นับรวมจำนวนประเทศที่ทายถูกทั้ง 5 รอบ
+                <br><span style="color: #475569;">&rarr; คนที่ได้ <strong>1–5</strong>: เทียบ H2H แบบไม่มี Phantom (ชนะคนที่ได้น้อยกว่า +1, เสมอคนที่ได้เท่ากัน +0.5)</span>
+                <br><span style="color: #b91c1c;">&rarr; คนที่ได้ <strong>0</strong>: ตีตกเป็น <strong>0 แต้มทันที</strong></span>
+              </li>
+            </ul>
+            <div class="callout-box info" style="margin-top: 10px; font-size: 0.88rem;">
+              <strong>💡 ตัวอย่าง (ผู้เล่น 10 คนในรอบ R1 โหมด Country Count):</strong> ทายถูก 6 คน, ทายผิด 4 คน &rarr;
+              ผู้ที่ทายถูกแต่ละคนจะชนะคนผิด 4 คน (+4) และเสมอคนถูกอีก 5 คน (+2.5) = ได้ <strong>6.5 แต้ม</strong> ส่วนผู้ที่ทายผิดทั้ง 4 คนจะได้ <strong>0 แต้ม</strong> ทันที (และหากมี 5 Seeds ก็นำคะแนนรวมทั้ง 5 Seeds มาหาร 5 เป็น Map Points)
+            </div>
+          </div>
         </div>
 
         <!-- Section 6 -->
@@ -764,6 +801,43 @@
             *Note: The Phantom Score mitigates trivial pixel/millimeter differences, rewarding round-by-round
             consistency and fair competition!
           </p>
+
+          <!-- Sub-section: Multi-Seed & Country Count -->
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 2px dashed #e2e8f0;">
+            <h4 style="color: var(--navy-primary); margin: 0 0 10px 0; font-size: 1.02rem;">
+              🔢 Multi-Seed Maps (e.g., 2 Seeds or 5 Seeds per Map):
+            </h4>
+            <p style="font-size: 0.93rem;">
+              Certain weekly maps may contain multiple challenge links (displayed as stacked <strong>▶ Seed 1</strong>, <strong>▶ Seed 2</strong>, ... buttons in the table header), with each seed still consisting of 5 locations:
+            </p>
+            <ul style="margin: 6px 0 12px 24px; line-height: 1.75; font-size: 0.92rem;">
+              <li>Each seed is scored <strong>independently</strong> using that map's scoring rules.</li>
+              <li>Your points across all seeds in that map are summed and <strong>divided by the total number of seeds</strong> in that map (e.g., divided by 2 for 2 seeds, or divided by 5 for 5 seeds, rounded to 1 decimal place) so the map weight stays balanced.</li>
+              <li><em>Note:</em> Any unplayed seed within a multi-seed map counts as <strong>0 points</strong> when averaged.</li>
+            </ul>
+
+            <h4 style="color: var(--navy-primary); margin: 16px 0 10px 0; font-size: 1.02rem;">
+              🌍 Special Mode: "Country Count" (Correct Country Scoring):
+            </h4>
+            <p style="font-size: 0.93rem;">
+              Maps tagged with <strong>🌍 Country</strong> are scored based on <strong>whether you guessed the correct country</strong> rather than raw 0–5,000 distance points:
+            </p>
+            <ul style="margin: 6px 0 10px 24px; line-height: 1.75; font-size: 0.92rem;">
+              <li><strong>No Phantom Score (0%):</strong> Evaluated strictly by exact country accuracy.</li>
+              <li><strong>Rounds 1–5 (R1–R5):</strong> Correct country = <strong>1</strong>; wrong country, ocean click, or timeout = <strong>0</strong>.
+                <br><span style="color: #475569;">&rarr; Players with <strong>1 (Correct)</strong>: Standard H2H (+1.0 pt per player with 0, +0.5 pt per player with 1).</span>
+                <br><span style="color: #b91c1c;">&rarr; Players with <strong>0 (Wrong)</strong>: Automatically receive <strong>0 pts</strong> for that round (no 0.5 tie points against other 0s).</span>
+              </li>
+              <li><strong>Round 6 (Total 0–5 Countries):</strong> Total correct countries across all 5 rounds.
+                <br><span style="color: #475569;">&rarr; Scores <strong>1–5</strong>: Standard H2H without Phantom (+1.0 vs lower score, +0.5 vs equal score).</span>
+                <br><span style="color: #b91c1c;">&rarr; Score of <strong>0</strong>: Automatically receives <strong>0 pts</strong>.</span>
+              </li>
+            </ul>
+            <div class="callout-box info" style="margin-top: 10px; font-size: 0.88rem;">
+              <strong>💡 Example (10 Players in R1 of Country Count):</strong> 6 correct, 4 wrong &rarr;
+              Each correct player beats 4 wrong players (+4) and ties 5 other correct players (+2.5) = <strong>6.5 pts</strong>, while all 4 wrong players receive <strong>0 pts</strong>. (If played across 5 seeds, total seed points are averaged by dividing by 5.)
+            </div>
+          </div>
         </div>
 
         <!-- Section 6 -->
