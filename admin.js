@@ -107,6 +107,168 @@ function extractToken(url) {
   return match ? match[1] : trimmed;
 }
 
+function getMapNum(c) {
+  return Number(c?.map_number || c?.seed_number || 0);
+}
+
+function getSubSeedNum(c) {
+  return Number(c?.sub_seed_number || 1);
+}
+
+function getGameType(c) {
+  return c?.game_type || "standard";
+}
+
+function sortChallenges(list) {
+  return [...(list || [])].sort(
+    (a, b) => getMapNum(a) - getMapNum(b) || getSubSeedNum(a) - getSubSeedNum(b)
+  );
+}
+
+function getDefaultMapPlaceholders(mapNum) {
+  const placeholders = [
+    "ชื่อแมพ & โหมด (เช่น Europe | Move 3')",
+    "ชื่อแมพ & โหมด (เช่น Asia | No move 2')",
+    "ชื่อแมพ & โหมด (เช่น Americas | NM 2')",
+    "ชื่อแมพ & โหมด (เช่น Africa | Move 3')",
+    "ชื่อแมพ & โหมด (เช่น World | Move 3')",
+    "ชื่อแมพ & โหมด (เช่น Urban World | NMPZ 1')",
+    "ชื่อแมพ & โหมด (เช่น Country Count | 5 Seeds)",
+  ];
+  return placeholders[mapNum - 1] || `ชื่อแมพ Map ${mapNum}`;
+}
+
+function renderSeedRowsHtml(prefix, mapNum, seedCount, urls = []) {
+  return Array.from({ length: seedCount }, (_, idx) => {
+    const sNum = idx + 1;
+    const val = urls[idx] || "";
+    const label = seedCount > 1 ? `Seed ${sNum}:` : `ลิงก์:`;
+    return `
+      <div class="map-seed-row">
+        <span class="map-seed-label">${label}</span>
+        <input type="text" class="${prefix}-map-url" data-map="${mapNum}" data-subseed="${sNum}"
+          placeholder="ลิงก์ Challenge Seed ${sNum} (เว้นว่างไว้ก่อนได้)" value="${escapeHtml(val)}">
+      </div>
+    `;
+  }).join("");
+}
+
+function renderMapBuilder(container, prefix, mapsConfig = []) {
+  if (!container) return;
+  container.innerHTML = [1, 2, 3, 4, 5, 6, 7]
+    .map((mapNum) => {
+      const cfg = mapsConfig.find((m) => m.mapNumber === mapNum) || {};
+      const name = cfg.name || "";
+      const gameType = cfg.gameType || "standard";
+      const urls = Array.isArray(cfg.urls) ? cfg.urls : [];
+      const seedCount = Math.max(1, Math.min(10, Number(cfg.seedCount || urls.length || 1)));
+
+      return `
+        <div class="map-builder-card" data-map-card="${mapNum}">
+          <div class="map-builder-header">
+            <strong>Map ${mapNum}:</strong>
+            <input type="text" class="${prefix}-map-name" data-map="${mapNum}"
+              placeholder="${escapeHtml(getDefaultMapPlaceholders(mapNum))}" value="${escapeHtml(name)}">
+            <select class="${prefix}-map-type" data-map="${mapNum}" title="ประเภทเกมและการคิดคะแนน">
+              <option value="standard" ${gameType === "standard" ? "selected" : ""}>📊 Standard (Raw + Phantom 10%)</option>
+              <option value="country_count" ${gameType === "country_count" ? "selected" : ""}>🌍 Country Count (No Phantom)</option>
+            </select>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <input type="number" class="${prefix}-map-seedcount" data-map="${mapNum}" min="1" max="10" value="${seedCount}"
+                title="จำนวน Seeds ใน Map นี้ (1-10)" onchange="updateMapBuilderSeedRows('${prefix}', ${mapNum}, this.value)">
+              <span style="font-size: 0.75rem; color: #64748b; white-space: nowrap;">seeds</span>
+            </div>
+          </div>
+          <div class="map-seeds-list" id="${prefix}-seeds-list-${mapNum}">
+            ${renderSeedRowsHtml(prefix, mapNum, seedCount, urls)}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+window.updateMapBuilderSeedRows = function (prefix, mapNum, rawCount) {
+  const count = Math.max(1, Math.min(10, parseInt(rawCount, 10) || 1));
+  const listEl = document.getElementById(`${prefix}-seeds-list-${mapNum}`);
+  if (!listEl) return;
+
+  // เก็บค่า URL ที่พิมพ์ค้างไว้ก่อน re-render
+  const currentUrls = Array.from(listEl.querySelectorAll(`.${prefix}-map-url`)).map((inp) => inp.value);
+  const countInput = listEl.closest(".map-builder-card")?.querySelector(`.${prefix}-map-seedcount`);
+  if (countInput) countInput.value = count;
+
+  listEl.innerHTML = renderSeedRowsHtml(prefix, mapNum, count, currentUrls);
+};
+
+function collectMapBuilderData(container, prefix) {
+  const items = [];
+  let usesAdvanced = false;
+
+  for (let mapNum = 1; mapNum <= 7; mapNum++) {
+    const card = container.querySelector(`[data-map-card="${mapNum}"]`);
+    const name = (card?.querySelector(`.${prefix}-map-name`)?.value || "").trim();
+    const gameType = card?.querySelector(`.${prefix}-map-type`)?.value || "standard";
+    const urlInputs = Array.from(card?.querySelectorAll(`.${prefix}-map-url`) || []);
+    const seedCount = Math.max(1, urlInputs.length);
+
+    if (seedCount > 1 || gameType !== "standard") {
+      usesAdvanced = true;
+    }
+
+    for (let sIdx = 0; sIdx < seedCount; sIdx++) {
+      const subSeedNum = sIdx + 1;
+      const rawUrl = (urlInputs[sIdx]?.value || "").trim();
+      let token = "";
+
+      if (rawUrl) {
+        token = extractToken(rawUrl);
+        if (!token) {
+          alert(`ลิงก์สำหรับ Map ${mapNum} (Seed ${subSeedNum}) ไม่ถูกต้อง (หากยังไม่มีลิงก์ ให้เว้นว่างไว้ก่อนได้)`);
+          return null;
+        }
+      }
+
+      items.push({
+        seed_number: mapNum,
+        map_number: mapNum,
+        sub_seed_number: subSeedNum,
+        game_type: gameType,
+        name: name || (token ? `Map ${mapNum}` : `Map ${mapNum} (TBD)`),
+        token: token || "",
+        url: token ? (rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`) : "",
+      });
+    }
+  }
+
+  return { items, usesAdvanced };
+}
+
+function buildMapsConfigFromChallenges(challenges) {
+  const sorted = sortChallenges(challenges);
+  const mapGroups = new Map();
+
+  sorted.forEach((c) => {
+    const m = getMapNum(c);
+    if (!mapGroups.has(m)) {
+      mapGroups.set(m, {
+        mapNumber: m,
+        name: c.name || "",
+        gameType: getGameType(c),
+        urls: [],
+      });
+    }
+    const g = mapGroups.get(m);
+    const urlVal = c.url || (c.token ? `https://www.geoguessr.com/challenge/${c.token}` : "");
+    g.urls.push(urlVal);
+  });
+
+  return Array.from(mapGroups.values()).map((g) => ({
+    ...g,
+    seedCount: Math.max(1, g.urls.length),
+  }));
+}
+
 /**
  * 1. โหลดและแสดงรายการสัปดาห์ทั้งหมด (พร้อมปุ่มจัดการเต็มรูปแบบ)
  */
@@ -147,14 +309,28 @@ async function loadWeeks() {
         dateInfoHtml += `<div style="font-size: 0.8rem; color: #64748b;">วันตัดรอบ: <strong>ไม่ได้กำหนด (แมนนวล)</strong></div>`;
       }
 
-      const challengesList = (w.challenges || [])
-        .sort((a, b) => a.seed_number - b.seed_number)
-        .map((c) => {
-          const hasLink = c.token && c.token.trim() !== "";
-          const bg = hasLink ? "#e2e8f0" : "#fee2e2";
-          const color = hasLink ? "#1e293b" : "#991b1b";
-          const linkIcon = hasLink ? "🔗" : "⚠️ ไม่มีลิงก์";
-          return `<span style="background: ${bg}; color: ${color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))} (${linkIcon})</span>`;
+      const sortedCh = sortChallenges(w.challenges || []);
+      const mapGroups = new Map();
+      sortedCh.forEach((c) => {
+        const m = getMapNum(c);
+        if (!mapGroups.has(m)) mapGroups.set(m, []);
+        mapGroups.get(m).push(c);
+      });
+
+      const challengesList = Array.from(mapGroups.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([mapNum, seeds]) => {
+          const first = seeds[0];
+          const totalSeeds = seeds.length;
+          const linkedCount = seeds.filter((s) => s.token && s.token.trim() !== "").length;
+          const hasAllLinks = linkedCount === totalSeeds;
+          const isPartial = linkedCount > 0 && linkedCount < totalSeeds;
+          const bg = hasAllLinks ? "#e2e8f0" : isPartial ? "#fef3c7" : "#fee2e2";
+          const color = hasAllLinks ? "#1e293b" : isPartial ? "#92400e" : "#991b1b";
+          const typeBadge = getGameType(first) === "country_count" ? " 🌍" : "";
+          const seedBadge = totalSeeds > 1 ? ` • ${totalSeeds} Seeds` : "";
+          const linkText = totalSeeds > 1 ? `🔗 ${linkedCount}/${totalSeeds}` : linkedCount > 0 ? "🔗" : "⚠️ ไม่มีลิงก์";
+          return `<span style="background: ${bg}; color: ${color}; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">M${mapNum}${typeBadge}: ${renderFlags(escapeHtml(first.name || `Map ${mapNum}`))}${seedBadge} (${linkText})</span>`;
         })
         .join(" ");
 
@@ -263,21 +439,8 @@ window.openEditModal = async function (weekId) {
     }
   }
 
-  // เตรียมข้อมูล 7 Maps
-  const challenges = (week.challenges || []).sort((a, b) => a.seed_number - b.seed_number);
-  
-  editMapsContainer.innerHTML = [1, 2, 3, 4, 5, 6, 7]
-    .map((seedNum) => {
-      const ch = challenges.find((c) => c.seed_number === seedNum) || {};
-      return `
-        <div class="map-row">
-          <strong>Map ${seedNum}:</strong>
-          <input type="text" class="edit-map-name" data-seed="${seedNum}" placeholder="ชื่อแมพ & โหมด (เว้นว่างได้)" value="${escapeHtml(ch.name || "")}">
-          <input type="text" class="edit-map-url" data-seed="${seedNum}" placeholder="ลิงก์ Challenge (เว้นว่างได้)" value="${escapeHtml(ch.url || (ch.token ? `https://www.geoguessr.com/challenge/${ch.token}` : ""))}">
-        </div>
-      `;
-    })
-    .join("");
+  const mapsConfig = buildMapsConfigFromChallenges(week.challenges || []);
+  renderMapBuilder(editMapsContainer, "edit", mapsConfig);
 
   editWeekModal.classList.add("open");
 };
@@ -300,48 +463,52 @@ editWeekForm.addEventListener("submit", async (e) => {
   const endDateVal = editWeekEndDate.value;
   const endDate = endDateVal ? new Date(endDateVal).toISOString() : null;
 
-  const nameInputs = document.querySelectorAll(".edit-map-name");
-  const urlInputs = document.querySelectorAll(".edit-map-url");
-  const challengesToUpsert = [];
+  const collected = collectMapBuilderData(editMapsContainer, "edit");
+  if (!collected) return;
 
-  for (let i = 0; i < 7; i++) {
-    const seedNum = i + 1;
-    const name = nameInputs[i].value.trim();
-    const rawUrl = urlInputs[i].value.trim();
-    let token = "";
-
-    if (rawUrl) {
-      token = extractToken(rawUrl);
-      if (!token) {
-        alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง (หากยังไม่มีลิงก์ ให้เว้นว่างไว้ก่อนได้)`);
-        return;
-      }
-    }
-
-    challengesToUpsert.push({
-      week_id: weekId,
-      seed_number: seedNum,
-      name: name || (token ? `Map ${seedNum}` : `Map ${seedNum} (TBD)`),
-      token: token || "",
-      url: token ? (rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`) : "",
-    });
-  }
+  const challengesToUpsert = collected.items.map((item) => ({
+    week_id: weekId,
+    ...item,
+  }));
 
   try {
-    // 0. ตรวจสอบการเปลี่ยน Token ของแต่ละ Map ว่ามีคะแนนเดิมค้างอยู่หรือไม่
+    // 0. ตรวจสอบการเปลี่ยน Token หรือการลดจำนวน Seed ที่อาจมีคะแนนค้างอยู่
     const { data: existingChallenges, error: exErr } = await adminDb
       .from("challenges")
-      .select("id, seed_number, token, name")
+      .select("*")
       .eq("week_id", weekId);
 
     if (exErr) throw exErr;
 
     const mapsWithChangedToken = [];
+    const removedChallenges = [];
+    const newKeys = new Set(challengesToUpsert.map((c) => `${c.map_number}:${c.sub_seed_number}`));
+
     if (existingChallenges && existingChallenges.length > 0) {
-      for (const ch of challengesToUpsert) {
-        const oldCh = existingChallenges.find((ec) => ec.seed_number === ch.seed_number);
-        if (oldCh && oldCh.token !== ch.token) {
-          // มีการเปลี่ยนโทเคน -> ตรวจสอบว่าแมพเก่ามีคะแนนบันทึกอยู่หรือไม่
+      for (const oldCh of existingChallenges) {
+        const oldMap = getMapNum(oldCh);
+        const oldSub = getSubSeedNum(oldCh);
+        const key = `${oldMap}:${oldSub}`;
+
+        if (!newKeys.has(key)) {
+          const { count } = await adminDb
+            .from("scores")
+            .select("*", { count: "exact", head: true })
+            .eq("challenge_id", oldCh.id);
+          removedChallenges.push({
+            oldId: oldCh.id,
+            map: oldMap,
+            subSeed: oldSub,
+            name: oldCh.name || `Map ${oldMap}`,
+            count: count || 0,
+          });
+          continue;
+        }
+
+        const newCh = challengesToUpsert.find(
+          (c) => c.map_number === oldMap && c.sub_seed_number === oldSub
+        );
+        if (newCh && oldCh.token !== newCh.token) {
           const { count, error: countErr } = await adminDb
             .from("scores")
             .select("*", { count: "exact", head: true })
@@ -350,8 +517,9 @@ editWeekForm.addEventListener("submit", async (e) => {
           if (!countErr && count > 0) {
             mapsWithChangedToken.push({
               oldId: oldCh.id,
-              seed: ch.seed_number,
-              name: oldCh.name || `Map ${ch.seed_number}`,
+              map: oldMap,
+              subSeed: oldSub,
+              name: oldCh.name || `Map ${oldMap}`,
               count: count,
             });
           }
@@ -359,25 +527,33 @@ editWeekForm.addEventListener("submit", async (e) => {
       }
     }
 
-    // ถ้าตรวจพบคะแนนเดิมในแมพที่เปลี่ยน Token ให้เตือน Admin ยืนยันการล้างคะแนนเก่า
-    if (mapsWithChangedToken.length > 0) {
-      const warningList = mapsWithChangedToken
-        .map((m) => `• Map ${m.seed} (${m.name}): มีคะแนนเดิมค้างอยู่ ${m.count} รายการ`)
-        .join("\n");
+    const removedWithScores = removedChallenges.filter((r) => r.count > 0);
+    if (mapsWithChangedToken.length > 0 || removedWithScores.length > 0) {
+      const warningParts = [];
+      mapsWithChangedToken.forEach((m) =>
+        warningParts.push(`• Map ${m.map} Seed ${m.subSeed} (${m.name}): เปลี่ยนลิงก์ (มีคะแนนเดิม ${m.count} รายการ)`)
+      );
+      removedWithScores.forEach((r) =>
+        warningParts.push(`• Map ${r.map} Seed ${r.subSeed} (${r.name}): ถูกลดจำนวน Seed ออก (มีคะแนนเดิม ${r.count} รายการ)`)
+      );
 
       const confirmMsg =
-        `⚠️ มีการเปลี่ยนลิงก์ Challenge Token ในแมพต่อไปนี้:\n\n` +
-        warningList +
-        `\n\nการเปลี่ยนลิงก์คือการเปลี่ยน seed การแข่งขันใหม่ คะแนนเดิมของแมพเหล่านี้จะไม่สามารถนำมารวมกับผู้เล่นใน seed ใหม่ได้ จึงต้องถูกล้างออก\n\nคุณยืนยันที่จะเปลี่ยนลิงก์และล้างคะแนนเดิมของแมพเหล่านี้หรือไม่?`;
+        `⚠️ มีการเปลี่ยนแปลงลิงก์หรือจำนวน Seed ที่มีคะแนนเดิมค้างอยู่:\n\n` +
+        warningParts.join("\n") +
+        `\n\nคะแนนเดิมใน Seed เหล่านี้จะถูกล้างออก คุณยืนยันที่จะบันทึกหรือไม่?`;
 
       if (!confirm(confirmMsg)) {
-        return; // ยกเลิก ไม่บันทึก
+        return;
       }
 
-      // ดำเนินการลบคะแนนของแมพที่เปลี่ยน token
       for (const m of mapsWithChangedToken) {
         await adminDb.from("scores").delete().eq("challenge_id", m.oldId);
       }
+    }
+
+    // ลบ sub-seed ที่ถูกลดจำนวนออก
+    for (const r of removedChallenges) {
+      await adminDb.from("challenges").delete().eq("id", r.oldId);
     }
 
     // 1. อัปเดตข้อมูลสัปดาห์
@@ -394,16 +570,37 @@ editWeekForm.addEventListener("submit", async (e) => {
 
     if (wErr) throw wErr;
 
-    // 2. อัปเดตข้อมูลทั้ง 7 Challenges
-    const { error: chErr } = await adminDb
+    // 2. อัปเดตข้อมูล Challenges ทั้งหมด (รองรับทั้ง DB ใหม่และ DB เก่าที่ยังไม่ migrate)
+    let { error: chErr } = await adminDb
       .from("challenges")
-      .upsert(challengesToUpsert, { onConflict: "week_id,seed_number" });
+      .upsert(challengesToUpsert, { onConflict: "week_id,map_number,sub_seed_number" });
 
-    if (chErr) throw chErr;
+    if (
+      chErr &&
+      (chErr.message?.includes("map_number") ||
+        chErr.message?.includes("sub_seed_number") ||
+        chErr.message?.includes("game_type") ||
+        chErr.message?.includes("on conflict") ||
+        chErr.code === "PGRST204" ||
+        chErr.code === "42P10")
+    ) {
+      if (collected.usesAdvanced) {
+        throw new Error(
+          "ฐานข้อมูล Supabase ยังไม่ได้รันคำสั่ง Migration สำหรับ Multi-Seed และ Game Type (กรุณารัน SQL Migration จากไฟล์ supabase_schema.sql ก่อนใช้งานฟีเจอร์นี้)"
+        );
+      }
+      const legacyUpserts = challengesToUpsert.map(({ map_number, sub_seed_number, game_type, ...rest }) => rest);
+      const { error: legacyErr } = await adminDb
+        .from("challenges")
+        .upsert(legacyUpserts, { onConflict: "week_id,seed_number" });
+      if (legacyErr) throw legacyErr;
+    } else if (chErr) {
+      throw chErr;
+    }
 
     alert(
       "✅ บันทึกการแก้ไขสัปดาห์และ 7 Maps เรียบร้อยแล้ว!" +
-        (mapsWithChangedToken.length > 0 ? "\n(ล้างคะแนนเก่าของ Map ที่เปลี่ยนลิงก์เรียบร้อยแล้ว)" : "")
+        (mapsWithChangedToken.length > 0 ? "\n(ล้างคะแนนเก่าของ Seed ที่เปลี่ยนลิงก์เรียบร้อยแล้ว)" : "")
     );
     closeEditModal();
     loadWeeks();
@@ -414,8 +611,11 @@ editWeekForm.addEventListener("submit", async (e) => {
 });
 
 /**
- * 4. สร้างสัปดาห์ใหม่พร้อม 7 Maps
+ * 4. สร้างสัปดาห์ใหม่พร้อม 7 Maps (รองรับ Multi-seed & Game Type)
  */
+const createMapsContainer = document.getElementById("mapsInputsContainer");
+renderMapBuilder(createMapsContainer, "create", []);
+
 createWeekForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!adminDb) {
@@ -432,31 +632,8 @@ createWeekForm.addEventListener("submit", async (e) => {
   const endDate = endDateVal ? new Date(endDateVal).toISOString() : null;
   const isInitialActive = document.querySelector('input[name="weekInitialStatus"]:checked')?.value === "active";
 
-  const mapNameInputs = document.querySelectorAll(".map-name-input");
-  const mapUrlInputs = document.querySelectorAll(".map-url-input");
-  const challengesData = [];
-
-  for (let i = 0; i < 7; i++) {
-    const seedNum = i + 1;
-    const name = mapNameInputs[i].value.trim();
-    const rawUrl = mapUrlInputs[i].value.trim();
-    let token = "";
-
-    if (rawUrl) {
-      token = extractToken(rawUrl);
-      if (!token) {
-        alert(`ลิงก์สำหรับ Map ${seedNum} ไม่ถูกต้อง (หากยังไม่มีลิงก์ ให้เว้นว่างไว้ก่อนได้)`);
-        return;
-      }
-    }
-
-    challengesData.push({
-      seed_number: seedNum,
-      name: name || (token ? `Map ${seedNum}` : `Map ${seedNum} (TBD)`),
-      token: token || "",
-      url: token ? (rawUrl.startsWith("http") ? rawUrl : `https://www.geoguessr.com/challenge/${token}`) : "",
-    });
-  }
+  const collected = collectMapBuilderData(createMapsContainer, "create");
+  if (!collected) return;
 
   try {
     // 1. ถ้าเลือกเป็น Active ตอนสร้าง ให้ตั้งสัปดาห์อื่น ๆ เป็น is_active = false
@@ -480,20 +657,36 @@ createWeekForm.addEventListener("submit", async (e) => {
 
     if (wErr) throw wErr;
 
-    // 3. แทรก 7 Challenges
-    const challengesToInsert = challengesData.map((c) => ({
+    // 3. แทรก Challenges
+    const challengesToInsert = collected.items.map((c) => ({
       week_id: newWeek.id,
-      seed_number: c.seed_number,
-      name: c.name,
-      token: c.token,
-      url: c.url,
+      ...c,
     }));
 
-    const { error: chErr } = await adminDb.from("challenges").insert(challengesToInsert);
-    if (chErr) throw chErr;
+    let { error: chErr } = await adminDb.from("challenges").insert(challengesToInsert);
+    if (
+      chErr &&
+      (chErr.message?.includes("map_number") ||
+        chErr.message?.includes("sub_seed_number") ||
+        chErr.message?.includes("game_type") ||
+        chErr.code === "PGRST204")
+    ) {
+      if (collected.usesAdvanced) {
+        await adminDb.from("weeks").delete().eq("id", newWeek.id);
+        throw new Error(
+          "ฐานข้อมูล Supabase ยังไม่ได้รันคำสั่ง Migration สำหรับ Multi-Seed และ Game Type (กรุณารัน SQL Migration จากไฟล์ supabase_schema.sql ก่อนใช้งานฟีเจอร์นี้)"
+        );
+      }
+      const legacyInsert = challengesToInsert.map(({ map_number, sub_seed_number, game_type, ...rest }) => rest);
+      const { error: legacyErr } = await adminDb.from("challenges").insert(legacyInsert);
+      if (legacyErr) throw legacyErr;
+    } else if (chErr) {
+      throw chErr;
+    }
 
     alert(`✅ สร้างสัปดาห์ "${title}" ${isInitialActive ? "(เปิดแข่งทันที)" : "(บันทึกเป็นแบบร่าง)"} สำเร็จแล้ว!`);
     createWeekForm.reset();
+    renderMapBuilder(createMapsContainer, "create", []);
     loadWeeks();
   } catch (err) {
     console.error("Error creating week:", err);
@@ -607,12 +800,12 @@ async function loadScoresForWeek(weekId) {
     // 1. ดึง Challenges ทั้งหมดของสัปดาห์นี้
     const { data: challenges, error: chErr } = await adminDb
       .from("challenges")
-      .select("id, seed_number, name")
+      .select("*")
       .eq("week_id", weekId)
       .order("seed_number", { ascending: true });
 
     if (chErr) throw chErr;
-    currentWeekChallenges = challenges || [];
+    currentWeekChallenges = sortChallenges(challenges || []);
 
     if (currentWeekChallenges.length === 0) {
       tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 24px; color: #94a3b8;">ไม่พบข้อมูล Map ในสัปดาห์นี้</td></tr>`;
@@ -622,10 +815,19 @@ async function loadScoresForWeek(weekId) {
     const chIds = currentWeekChallenges.map((c) => c.id);
 
     // 2. ดึงคะแนนทั้งหมดของ Challenges ในสัปดาห์นี้ พร้อมข้อมูล players, played_at, total_time
-    const { data: scores, error: scErr } = await adminDb
+    let { data: scores, error: scErr } = await adminDb
       .from("scores")
       .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time, updated_at, players(id, username)")
       .in("challenge_id", chIds);
+
+    if (scErr && (scErr.message?.includes("played_at") || scErr.code === "PGRST204")) {
+      const fb = await adminDb
+        .from("scores")
+        .select("id, challenge_id, player_id, total_score, r1, r2, r3, r4, r5, updated_at, players(id, username)")
+        .in("challenge_id", chIds);
+      scores = fb.data;
+      scErr = fb.error;
+    }
 
     if (scErr) throw scErr;
     currentWeekScores = scores || [];
@@ -668,7 +870,7 @@ window.renderScoresList = function () {
   const filtered = currentWeekScores.filter((s) => {
     const ch = chMap[s.challenge_id];
     if (mapFilter !== "all") {
-      if (!ch || String(ch.seed_number) !== mapFilter) return false;
+      if (!ch || String(getMapNum(ch)) !== mapFilter) return false;
     }
     if (searchFilter) {
       const uName = (s.players?.username || "").toLowerCase();
@@ -720,9 +922,9 @@ window.renderScoresList = function () {
       case "score_asc":
         return totalA - totalB || timeB - timeA;
       case "map_asc":
-        return chA.seed_number - chB.seed_number || totalB - totalA;
+        return getMapNum(chA) - getMapNum(chB) || getSubSeedNum(chA) - getSubSeedNum(chB) || totalB - totalA;
       case "map_desc":
-        return chB.seed_number - chA.seed_number || totalB - totalA;
+        return getMapNum(chB) - getMapNum(chA) || getSubSeedNum(chB) - getSubSeedNum(chA) || totalB - totalA;
       case "player_asc":
         return nameA.localeCompare(nameB) || totalB - totalA;
       case "player_desc":
@@ -739,9 +941,19 @@ window.renderScoresList = function () {
     return;
   }
 
+  const mapSeedCounts = new Map();
+  currentWeekChallenges.forEach((c) => {
+    const m = getMapNum(c);
+    mapSeedCounts.set(m, (mapSeedCounts.get(m) || 0) + 1);
+  });
+
   tbody.innerHTML = filtered
     .map((s, idx) => {
       const ch = chMap[s.challenge_id] || { seed_number: "?", name: "Unknown" };
+      const mapNum = getMapNum(ch);
+      const subSeed = getSubSeedNum(ch);
+      const isMulti = (mapSeedCounts.get(mapNum) || 1) > 1;
+      const isCountry = getGameType(ch) === "country_count";
       const username = s.players?.username || `Player #${s.player_id}`;
       const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
 
@@ -769,6 +981,9 @@ window.renderScoresList = function () {
       }
 
       const durText = s.total_time ? `<div style="font-size: 0.72rem; color: #0284c7; font-weight: 600; margin-top: 2px;">⚡ ${formatDuration(s.total_time)}</div>` : "";
+      const fmtRound = (val) =>
+        isCountry ? (Number(val) === 1 ? "✅ 1" : "❌ 0") : (val ?? 0).toLocaleString();
+      const totalLabel = isCountry ? `${total} / 5` : total.toLocaleString();
 
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
@@ -778,20 +993,20 @@ window.renderScoresList = function () {
           </td>
           <td style="text-align: center; padding: 8px;">
             <span style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;">
-              Map ${ch.seed_number}
+              Map ${mapNum}${isMulti ? ` (S${subSeed})` : ""}${isCountry ? " 🌍" : ""}
             </span>
             <div style="font-size: 0.73rem; color: #64748b; margin-top: 2px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${renderFlags(escapeHtml(ch.name || ""))}</div>
           </td>
           <td style="text-align: center; padding: 6px 8px; background: #fffbeb;">
             ${timeDisplay}
           </td>
-          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r1 ?? 0).toLocaleString()}</td>
-          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r2 ?? 0).toLocaleString()}</td>
-          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r3 ?? 0).toLocaleString()}</td>
-          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r4 ?? 0).toLocaleString()}</td>
-          <td style="text-align: center; padding: 8px; color: #475569;">${(s.r5 ?? 0).toLocaleString()}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${fmtRound(s.r1)}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${fmtRound(s.r2)}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${fmtRound(s.r3)}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${fmtRound(s.r4)}</td>
+          <td style="text-align: center; padding: 8px; color: #475569;">${fmtRound(s.r5)}</td>
           <td style="text-align: center; padding: 8px; font-weight: bold; background: #eff6ff; color: #1e3a8a;">
-            <div>${total.toLocaleString()}</div>
+            <div>${totalLabel}</div>
             ${durText}
           </td>
           <td style="text-align: center; padding: 8px;">
@@ -872,20 +1087,59 @@ window.openManualScoreForm = function () {
     alert("ไม่พบข้อมูล Map สำหรับสัปดาห์นี้");
     return;
   }
+  const mapSeedCounts = new Map();
+  currentWeekChallenges.forEach((c) => {
+    const m = getMapNum(c);
+    mapSeedCounts.set(m, (mapSeedCounts.get(m) || 0) + 1);
+  });
+
   const select = document.getElementById("manualMapSelect");
   select.innerHTML = currentWeekChallenges
-    .map((c) => `<option value="${c.id}">Map ${c.seed_number}: ${escapeHtml(c.name || "")}</option>`)
+    .map((c) => {
+      const m = getMapNum(c);
+      const sub = getSubSeedNum(c);
+      const multiTag = (mapSeedCounts.get(m) || 1) > 1 ? ` (Seed ${sub})` : "";
+      const typeTag = getGameType(c) === "country_count" ? " [🌍 Country Count]" : "";
+      return `<option value="${c.id}">Map ${m}${multiTag}: ${escapeHtml(c.name || "")}${typeTag}</option>`;
+    })
     .join("");
 
   document.getElementById("manualUsername").value = "";
-  document.getElementById("manualR1").value = "0";
-  document.getElementById("manualR2").value = "0";
-  document.getElementById("manualR3").value = "0";
-  document.getElementById("manualR4").value = "0";
-  document.getElementById("manualR5").value = "0";
-  calcManualTotal();
+  ["manualR1", "manualR2", "manualR3", "manualR4", "manualR5"].forEach((id) => {
+    document.getElementById(id).value = "0";
+  });
+  onManualMapChange();
 
   document.getElementById("manualScoreModal").classList.add("open");
+};
+
+window.onManualMapChange = function () {
+  const challengeId = Number(document.getElementById("manualMapSelect")?.value);
+  const ch = currentWeekChallenges.find((c) => c.id === challengeId);
+  const isCountry = getGameType(ch) === "country_count";
+  const maxRound = isCountry ? 1 : 5000;
+  const maxTotalEl = document.getElementById("manualMaxTotalLabel");
+  const hintEl = document.getElementById("manualGameTypeHint");
+
+  if (maxTotalEl) maxTotalEl.textContent = isCountry ? "5 (ประเทศ)" : "25,000";
+  if (hintEl) {
+    hintEl.textContent = isCountry
+      ? "🌍 โหมด Country Count: ใส่ 1 = ถูกประเทศ, 0 = ผิดประเทศ"
+      : "📊 โหมด Standard: ใส่คะแนน 0 - 5,000 ต่อรอบ";
+  }
+
+  document.querySelectorAll(".manual-round-lbl").forEach((lbl, idx) => {
+    lbl.textContent = isCountry ? `R${idx + 1} (0/1):` : `R${idx + 1} (0-5k):`;
+  });
+
+  ["manualR1", "manualR2", "manualR3", "manualR4", "manualR5"].forEach((id) => {
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    inp.max = String(maxRound);
+    if (Number(inp.value) > maxRound) inp.value = String(maxRound);
+  });
+
+  calcManualTotal();
 };
 
 window.closeManualScoreModal = function () {
@@ -909,12 +1163,14 @@ if (manualScoreForm) {
     if (!adminDb) return;
 
     const challengeId = Number(document.getElementById("manualMapSelect").value);
+    const ch = currentWeekChallenges.find((c) => c.id === challengeId);
+    const maxRound = getGameType(ch) === "country_count" ? 1 : 5000;
     const username = document.getElementById("manualUsername").value.trim();
-    const r1 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR1").value, 10) || 0));
-    const r2 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR2").value, 10) || 0));
-    const r3 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR3").value, 10) || 0));
-    const r4 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR4").value, 10) || 0));
-    const r5 = Math.min(5000, Math.max(0, parseInt(document.getElementById("manualR5").value, 10) || 0));
+    const r1 = Math.min(maxRound, Math.max(0, parseInt(document.getElementById("manualR1").value, 10) || 0));
+    const r2 = Math.min(maxRound, Math.max(0, parseInt(document.getElementById("manualR2").value, 10) || 0));
+    const r3 = Math.min(maxRound, Math.max(0, parseInt(document.getElementById("manualR3").value, 10) || 0));
+    const r4 = Math.min(maxRound, Math.max(0, parseInt(document.getElementById("manualR4").value, 10) || 0));
+    const r5 = Math.min(maxRound, Math.max(0, parseInt(document.getElementById("manualR5").value, 10) || 0));
     const total = r1 + r2 + r3 + r4 + r5;
 
     if (!username) {
@@ -1055,6 +1311,8 @@ window.exportMasterCSV = async function () {
       "Week Title",
       "Week Status",
       "Map Number",
+      "Sub Seed",
+      "Game Type",
       "Map Name",
       "Player Pseudo",
       "Player User ID",
@@ -1063,7 +1321,7 @@ window.exportMasterCSV = async function () {
       "Round 3",
       "Round 4",
       "Round 5",
-      "Total Score (25k)",
+      "Total Score",
       "Updated At",
     ];
 
@@ -1078,7 +1336,9 @@ window.exportMasterCSV = async function () {
       return [
         `"${(wk.title || "").replace(/"/g, '""')}"`,
         `"${wk.is_frozen ? "Frozen" : "Active"}"`,
-        `"Map ${ch.seed_number || ""}"`,
+        `"Map ${getMapNum(ch) || ""}"`,
+        getSubSeedNum(ch),
+        `"${getGameType(ch)}"`,
         `"${(ch.name || "").replace(/"/g, '""')}"`,
         `"${uName.replace(/"/g, '""')}"`,
         `"${s.player_id}"`,
@@ -1123,14 +1383,25 @@ window.openAdjustmentsModal = async function (weekId, weekTitle) {
 
   const { data: challenges } = await adminDb
     .from("challenges")
-    .select("id, seed_number, name")
+    .select("*")
     .eq("week_id", weekId)
     .order("seed_number", { ascending: true });
 
-  currentAdjChallenges = challenges || [];
+  currentAdjChallenges = sortChallenges(challenges || []);
+  const mapSeedCounts = new Map();
+  currentAdjChallenges.forEach((c) => {
+    const m = getMapNum(c);
+    mapSeedCounts.set(m, (mapSeedCounts.get(m) || 0) + 1);
+  });
+
   const mapSelect = document.getElementById("adjMapSelect");
   mapSelect.innerHTML = currentAdjChallenges
-    .map((c) => `<option value="${c.id}">Map ${c.seed_number}: ${escapeHtml(c.name || `Map ${c.seed_number}`)}</option>`)
+    .map((c) => {
+      const m = getMapNum(c);
+      const sub = getSubSeedNum(c);
+      const seedTag = (mapSeedCounts.get(m) || 1) > 1 ? ` (Seed ${sub})` : "";
+      return `<option value="${c.id}">Map ${m}${seedTag}: ${escapeHtml(c.name || `Map ${m}`)}</option>`;
+    })
     .join("");
 
   updateRuleInputsVisibility();
@@ -1189,6 +1460,9 @@ async function loadActiveAdjustments(weekId) {
     tbody.innerHTML = adjustments
       .map((adj) => {
         const ch = currentAdjChallenges.find((c) => c.id === adj.challenge_id) || { seed_number: "?" };
+        const mNum = getMapNum(ch) || "?";
+        const subNum = getSubSeedNum(ch);
+        const hasMulti = currentAdjChallenges.filter((x) => getMapNum(x) === mNum).length > 1;
         let ruleDesc = "";
         if (adj.rule_type === "threshold_to_max") {
           ruleDesc = `คะแนน &ge; <strong>${adj.min_score.toLocaleString()}</strong> &rarr; ปรับเป็น <strong style="color: #16a34a;">${adj.target_score.toLocaleString()}</strong>`;
@@ -1200,7 +1474,7 @@ async function loadActiveAdjustments(weekId) {
 
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="text-align: center; font-weight: bold; color: #00247d;">Map ${ch.seed_number}</td>
+            <td style="text-align: center; font-weight: bold; color: #00247d;">Map ${mNum}${hasMulti ? ` (S${subNum})` : ""}</td>
             <td style="text-align: center; font-weight: 600;">Round ${adj.round_number}</td>
             <td style="text-align: left; padding-left: 10px;">${ruleDesc}</td>
             <td style="text-align: left; padding-left: 10px; color: #64748b; font-size: 0.8rem;">${escapeHtml(adj.note || "-")}</td>
@@ -1335,9 +1609,94 @@ window.deleteAdjustment = async function (adjId) {
 let allDirectoryPlayers = [];
 
 // ==========================================
-// ฟังก์ชันช่วยคำนวณการจัดอันดับและผู้ชนะรายแมพ/รายรอบ (Helper for Map Wins & Round Wins)
+// ฟังก์ชันกลางคำนวณคะแนน Head-to-Head ต่อ 1 Seed (รองรับทั้ง Standard และ Country Count)
 // ==========================================
-function computeMapRankings(pScores) {
+function scoreSingleSeedList(pList, gameType = "standard") {
+  if (!pList || pList.length === 0) return [];
+  const isCountryCount = gameType === "country_count";
+
+  for (let m = 0; m < 6; m++) {
+    const maxScore = isCountryCount ? (m < 5 ? 1 : 5) : (m < 5 ? 5000 : 25000);
+
+    pList.forEach((p) => {
+      p.phantoms = p.phantoms || [];
+      p.points = p.points || [];
+      p.h2h = p.h2h || [];
+
+      const raw = p.raw[m];
+      if (isCountryCount) {
+        p.phantoms[m] = raw; // No Phantom
+      } else {
+        const missing = Math.max(0, maxScore - raw);
+        p.phantoms[m] = raw + 0.1 * missing;
+      }
+    });
+
+    pList.forEach((p, i) => {
+      let pts = 0;
+      let wins = 0;
+      let ties = 0;
+      let losses = 0;
+      const pRaw = p.raw[m];
+      const pPhan = p.phantoms[m];
+
+      if (isCountryCount && pRaw === 0) {
+        // กฎ Country Count: ถ้าได้ 0 ในรอบนั้น (หรือ 0 ใน Total) ตีตกเป็น 0 แต้มทันที
+        pList.forEach((opp, j) => {
+          if (i === j) return;
+          if (opp.raw[m] > 0) losses += 1;
+        });
+        p.points[m] = 0;
+        p.h2h[m] = { wins: 0, ties: 0, losses, zeroed: true };
+      } else {
+        pList.forEach((opp, j) => {
+          if (i === j) return;
+          const oppRaw = opp.raw[m];
+          const oppPhan = opp.phantoms[m];
+
+          if (isCountryCount) {
+            if (pRaw > oppRaw) {
+              pts += 1;
+              wins += 1;
+            } else if (pRaw === oppRaw) {
+              pts += 0.5;
+              ties += 1;
+            } else {
+              losses += 1;
+            }
+          } else {
+            if (pRaw > oppPhan && oppRaw <= pPhan) {
+              pts += 1;
+              wins += 1;
+            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
+              pts += 0.5;
+              ties += 1;
+            } else {
+              losses += 1;
+            }
+          }
+        });
+        p.points[m] = pts;
+        p.h2h[m] = { wins, ties, losses, zeroed: false };
+      }
+    });
+  }
+
+  pList.forEach((p) => {
+    p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
+    p.ptsMap = Math.round(p.ptsRounds);
+  });
+
+  pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+  pList.forEach((p, idx) => {
+    const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
+    p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
+  });
+
+  return pList;
+}
+
+function computeMapRankings(pScores, gameType = "standard") {
   if (!pScores || pScores.length === 0) return new Map();
 
   const pList = pScores.map((s) => ({
@@ -1352,49 +1711,14 @@ function computeMapRankings(pScores) {
     ],
     phantoms: [],
     points: [],
+    h2h: [],
   }));
 
   const maxRounds = [0, 1, 2, 3, 4].map((m) => Math.max(...pList.map((p) => p.raw[m])));
-
-  for (let m = 0; m < 6; m++) {
-    const maxScore = m < 5 ? 5000 : 25000;
-    pList.forEach((p) => {
-      const raw = p.raw[m];
-      const missing = Math.max(0, maxScore - raw);
-      p.phantoms[m] = raw + 0.1 * missing;
-    });
-
-    pList.forEach((p, i) => {
-      let pts = 0;
-      const pRaw = p.raw[m];
-      const pPhan = p.phantoms[m];
-
-      pList.forEach((opp, j) => {
-        if (i === j) return;
-        const oppRaw = opp.raw[m];
-        const oppPhan = opp.phantoms[m];
-
-        if (pRaw > oppPhan && oppRaw <= pPhan) {
-          pts += 1;
-        } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
-          pts += 0.5;
-        }
-      });
-      p.points[m] = pts;
-    });
-  }
-
-  pList.forEach((p) => {
-    p.ptsMap = Math.round(p.points.reduce((a, b) => a + b, 0));
-  });
-
-  pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+  scoreSingleSeedList(pList, gameType);
 
   const resultMap = new Map();
-  pList.forEach((p, idx) => {
-    const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
-    p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
-
+  pList.forEach((p) => {
     let roundWins = 0;
     for (let m = 0; m < 5; m++) {
       if (p.raw[m] === maxRounds[m] && maxRounds[m] > 0) {
@@ -1439,6 +1763,13 @@ async function loadPlayerDirectory() {
     allDirectoryPlayers = players || [];
     document.getElementById("playerDirTotalCount").textContent = allDirectoryPlayers.length;
 
+    const { data: challengesMeta } = await adminDb
+      .from("challenges")
+      .select("id, game_type");
+
+    const chTypeMap = new Map();
+    (challengesMeta || []).forEach((c) => chTypeMap.set(c.id, getGameType(c)));
+
     const { data: scores, error: scErr } = await adminDb
       .from("scores")
       .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score");
@@ -1453,7 +1784,7 @@ async function loadPlayerDirectory() {
 
     const challengeRankingsMap = new Map();
     scoresByChallenge.forEach((chScores, chId) => {
-      challengeRankingsMap.set(chId, computeMapRankings(chScores));
+      challengeRankingsMap.set(chId, computeMapRankings(chScores, chTypeMap.get(chId) || "standard"));
     });
 
     const statsMap = new Map();
@@ -1463,10 +1794,13 @@ async function loadPlayerDirectory() {
       }
       const st = statsMap.get(s.player_id);
       st.maps++;
-      [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
-        if (r === 5000) st.count5k++;
-      });
-      if (s.total_score === 25000) st.count25k++;
+      const gType = chTypeMap.get(s.challenge_id) || "standard";
+      if (gType !== "country_count") {
+        [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
+          if (r === 5000) st.count5k++;
+        });
+        if (s.total_score === 25000) st.count25k++;
+      }
 
       const chMap = challengeRankingsMap.get(s.challenge_id);
       const rInfo = chMap?.get(s.player_id);
@@ -1574,6 +1908,11 @@ window.openAdminPlayerProfile = async function (playerId) {
         .select("challenge_id, player_id, r1, r2, r3, r4, r5, total_score")
         .in("challenge_id", chIds);
 
+      const chTypeById = new Map();
+      allScores.forEach((s) => {
+        if (s.challenges) chTypeById.set(s.challenge_id, getGameType(s.challenges));
+      });
+
       const byCh = new Map();
       (relatedScores || []).forEach((s) => {
         if (!byCh.has(s.challenge_id)) byCh.set(s.challenge_id, []);
@@ -1581,7 +1920,7 @@ window.openAdminPlayerProfile = async function (playerId) {
       });
 
       byCh.forEach((scoresList, cId) => {
-        chRankingsMap.set(cId, computeMapRankings(scoresList));
+        chRankingsMap.set(cId, computeMapRankings(scoresList, chTypeById.get(cId) || "standard"));
       });
     }
 
@@ -1592,10 +1931,13 @@ window.openAdminPlayerProfile = async function (playerId) {
     const uniqueWeeks = new Set();
 
     allScores.forEach((s) => {
-      [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
-        if (r === 5000) count5k++;
-      });
-      if (s.total_score === 25000) count25k++;
+      const gType = getGameType(s.challenges);
+      if (gType !== "country_count") {
+        [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
+          if (r === 5000) count5k++;
+        });
+        if (s.total_score === 25000) count25k++;
+      }
       if (s.challenges?.week_id) uniqueWeeks.add(s.challenges.week_id);
 
       const chRank = chRankingsMap.get(s.challenge_id)?.get(playerId);
@@ -1621,14 +1963,17 @@ window.openAdminPlayerProfile = async function (playerId) {
       const wA = a.challenges?.week_id || 0;
       const wB = b.challenges?.week_id || 0;
       if (wB !== wA) return wB - wA;
-      return (a.challenges?.seed_number || 0) - (b.challenges?.seed_number || 0);
+      return getMapNum(a.challenges) - getMapNum(b.challenges) || getSubSeedNum(a.challenges) - getSubSeedNum(b.challenges);
     });
 
     tbody.innerHTML = allScores
       .map((s) => {
         const ch = s.challenges || {};
         const wk = ch.weeks || {};
-        const modeInfo = detectMapMode(ch.name);
+        const isCountry = getGameType(ch) === "country_count";
+        const modeInfo = isCountry
+          ? { label: "Country", cls: "other" }
+          : detectMapMode(ch.name);
         const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
         const statusTag = wk.is_frozen
           ? `<span style="font-size: 0.7rem; background: #e0f2fe; color: #0369a1; padding: 1px 4px; border-radius: 3px;">Frozen</span>`
@@ -1638,6 +1983,11 @@ window.openAdminPlayerProfile = async function (playerId) {
         const maxR = chRank?.maxRounds || [];
 
         const renderR = (val, idx) => {
+          if (isCountry) {
+            return Number(val) === 1
+              ? `<strong style="color: #15803d;">✅ 1</strong>`
+              : `<span style="color: #94a3b8;">❌ 0</span>`;
+          }
           const isWin = maxR[idx] !== undefined && val === maxR[idx] && maxR[idx] > 0;
           if (isWin) {
             return `<strong style="color: #15803d;" title="Round ${idx + 1} Best Score!">★ ${(val ?? 0).toLocaleString()}</strong>`;
@@ -1646,6 +1996,9 @@ window.openAdminPlayerProfile = async function (playerId) {
         };
 
         const mapWinBadge = chRank?.isMapWin ? `<span style="margin-left: 4px;" title="อันดับ 1 ของแมพนี้!">🥇</span>` : "";
+        const mNum = getMapNum(ch);
+        const sNum = getSubSeedNum(ch);
+        const seedSubText = sNum > 1 ? ` (S${sNum})` : "";
 
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
@@ -1653,7 +2006,7 @@ window.openAdminPlayerProfile = async function (playerId) {
               ${escapeHtml(wk.title || `W${ch.week_id}`)} ${statusTag}
             </td>
             <td style="text-align: left; padding-left: 10px;">
-              <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))} ${mapWinBadge}
+              <strong>M${mNum}${seedSubText}:</strong> ${renderFlags(escapeHtml(ch.name || `Map ${mNum}`))} ${mapWinBadge}
             </td>
             <td><span class="mode-tag ${modeInfo.cls}">${modeInfo.label}</span></td>
             <td>${renderR(s.r1, 0)}</td>
@@ -1661,7 +2014,7 @@ window.openAdminPlayerProfile = async function (playerId) {
             <td>${renderR(s.r3, 2)}</td>
             <td>${renderR(s.r4, 3)}</td>
             <td>${renderR(s.r5, 4)}</td>
-            <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">${total.toLocaleString()}</td>
+            <td style="background: #eff6ff; font-weight: bold; color: #1e3a8a;">${isCountry ? `${total}/5` : total.toLocaleString()}</td>
           </tr>
         `;
       })
@@ -1702,10 +2055,12 @@ window.addEventListener("keydown", (e) => {
 let inspWeekId = null;
 let inspWeekChallenges = [];
 let inspWeekScores = [];
-let inspCalculatedMaps = new Map();
-let inspSelectedSeed = 1;
+let inspCalculatedSeeds = new Map(); // challengeId -> pList
+let inspCalculatedMapGroups = new Map(); // mapNumber -> { mapNumber, name, gameType, seeds, leaderboard }
+let inspSelectedMap = 1;
+let inspSelectedSubSeed = 0; // 0 = Map Overview (multi-seed avg), 1..N = specific seed
 let inspCurrentSubView = "map"; // "map" | "round"
-let inspSelectedRound = 0; // 0..4 = R1..R5, 5 = Total 25k (R6)
+let inspSelectedRound = 0; // 0..4 = R1..R5, 5 = Total (R6)
 
 function getRankClass(rank) {
   if (rank === 1) return "rank-gold";
@@ -1753,10 +2108,10 @@ async function loadAndComputeInspectorData(weekId) {
       .order("seed_number", { ascending: true });
 
     if (chErr) throw chErr;
-    inspWeekChallenges = challenges || [];
+    inspWeekChallenges = sortChallenges(challenges || []);
 
     const chIds = inspWeekChallenges.map((c) => c.id);
-    const { data: scores, error: scErr } = await adminDb
+    let { data: scores, error: scErr } = await adminDb
       .from("scores")
       .select("*, players(id, username)")
       .in("challenge_id", chIds);
@@ -1765,7 +2120,10 @@ async function loadAndComputeInspectorData(weekId) {
     inspWeekScores = scores || [];
 
     computeInspectorCalculations();
-    inspSelectedSeed = inspWeekChallenges[0]?.seed_number || 1;
+    const firstMapNum = inspWeekChallenges[0] ? getMapNum(inspWeekChallenges[0]) : 1;
+    inspSelectedMap = firstMapNum;
+    const firstGroup = inspCalculatedMapGroups.get(firstMapNum);
+    inspSelectedSubSeed = firstGroup && firstGroup.seeds.length > 1 ? 0 : 1;
     inspCurrentSubView = "map";
     inspSelectedRound = 0;
 
@@ -1777,7 +2135,8 @@ async function loadAndComputeInspectorData(weekId) {
 }
 
 function computeInspectorCalculations() {
-  inspCalculatedMaps.clear();
+  inspCalculatedSeeds.clear();
+  inspCalculatedMapGroups.clear();
 
   inspWeekChallenges.forEach((c) => {
     const rawScores = inspWeekScores.filter((s) => s.challenge_id === c.id);
@@ -1792,75 +2151,81 @@ function computeInspectorCalculations() {
         s.r3 || 0,
         s.r4 || 0,
         s.r5 || 0,
-        s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0))
+        s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0)),
       ],
       phantoms: [],
       points: [],
-      h2h: []
+      h2h: [],
     }));
 
-    if (pList.length > 0) {
-      for (let m = 0; m < 6; m++) {
-        const maxScore = m < 5 ? 5000 : 25000;
+    scoreSingleSeedList(pList, getGameType(c));
+    inspCalculatedSeeds.set(c.id, pList);
+  });
 
-        pList.forEach((p) => {
-          const raw = p.raw[m];
-          const missing = Math.max(0, maxScore - raw);
-          const phantom = raw + 0.1 * missing;
-          p.phantoms[m] = phantom;
-        });
+  // จัดกลุ่มเป็น 7 Maps เพื่อคำนวณค่าเฉลี่ย Multi-Seed (ถ้ามี > 1 Seed)
+  const byMap = new Map();
+  inspWeekChallenges.forEach((c) => {
+    const m = getMapNum(c);
+    if (!byMap.has(m)) byMap.set(m, []);
+    byMap.get(m).push(c);
+  });
 
-        // Pairwise Head-to-Head Half-Tie
-        pList.forEach((p, i) => {
-          let pts = 0;
-          let wins = 0;
-          let ties = 0;
-          let losses = 0;
-          const pRaw = p.raw[m];
-          const pPhan = p.phantoms[m];
+  byMap.forEach((seeds, mapNum) => {
+    const sortedSeeds = sortChallenges(seeds);
+    const first = sortedSeeds[0];
+    const seedCount = sortedSeeds.length;
+    const gameType = getGameType(first);
+    const playerAgg = new Map();
 
-          pList.forEach((opp, j) => {
-            if (i === j) return;
-            const oppRaw = opp.raw[m];
-            const oppPhan = opp.phantoms[m];
-
-            if (pRaw > oppPhan && oppRaw <= pPhan) {
-              pts += 1;
-              wins += 1;
-            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
-              pts += 0.5;
-              ties += 1;
-            } else {
-              losses += 1;
-            }
+    sortedSeeds.forEach((ch) => {
+      const sList = inspCalculatedSeeds.get(ch.id) || [];
+      sList.forEach((p) => {
+        if (!playerAgg.has(p.playerId)) {
+          playerAgg.set(p.playerId, {
+            playerId: p.playerId,
+            username: p.username,
+            seedData: {},
+            sumPts: 0,
+            sumRaw: 0,
           });
-
-          p.points[m] = pts;
-          p.h2h[m] = { wins, ties, losses };
-        });
-      }
-
-      // Map Points = sum of 6 rounds, rounded with Math.round
-      pList.forEach((p) => {
-        p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
-        p.ptsMap = Math.round(p.ptsRounds);
+        }
+        const agg = playerAgg.get(p.playerId);
+        agg.seedData[ch.id] = p;
+        agg.sumPts += p.ptsMap;
+        agg.sumRaw += p.raw[5];
       });
+    });
 
-      // Sort by ptsMap desc, tiebreaker raw total
-      pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+    const leaderboard = Array.from(playerAgg.values()).map((agg) => ({
+      ...agg,
+      ptsMap: seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10,
+    }));
 
-      pList.forEach((p, idx) => {
-        const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
-        p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
-      });
-    }
+    leaderboard.sort((a, b) => b.ptsMap - a.ptsMap || b.sumRaw - a.sumRaw);
+    leaderboard.forEach((p, idx) => {
+      const isTie = idx > 0 && leaderboard[idx - 1].ptsMap === p.ptsMap;
+      p.mapRank = isTie ? leaderboard[idx - 1].mapRank : idx + 1;
+    });
 
-    inspCalculatedMaps.set(c.id, pList);
+    inspCalculatedMapGroups.set(mapNum, {
+      mapNumber: mapNum,
+      name: first.name || `Map ${mapNum}`,
+      gameType,
+      seeds: sortedSeeds,
+      leaderboard,
+    });
   });
 }
 
-window.selectInspectorMap = function (seedNum) {
-  inspSelectedSeed = seedNum;
+window.selectInspectorMap = function (mapNum) {
+  inspSelectedMap = mapNum;
+  const grp = inspCalculatedMapGroups.get(mapNum);
+  inspSelectedSubSeed = grp && grp.seeds.length > 1 ? 0 : 1;
+  renderMapInspector();
+};
+
+window.selectInspectorSubSeed = function (subSeedNum) {
+  inspSelectedSubSeed = subSeedNum;
   renderMapInspector();
 };
 
@@ -1876,30 +2241,142 @@ window.selectInspectorRound = function (rndIdx) {
 
 function renderMapInspector() {
   const pillsContainer = document.getElementById("inspectorMapPills");
-  pillsContainer.innerHTML = inspWeekChallenges
-    .map((c) => {
-      const isSel = c.seed_number === inspSelectedSeed;
+  const mapEntries = Array.from(inspCalculatedMapGroups.values()).sort((a, b) => a.mapNumber - b.mapNumber);
+
+  pillsContainer.innerHTML = mapEntries
+    .map((grp) => {
+      const isSel = grp.mapNumber === inspSelectedMap;
       const bgStyle = isSel
         ? "background: #0284c7; color: white; border-color: #0284c7;"
         : "background: white; color: #475569; border: 1px solid #cbd5e1;";
+      const typeTag = grp.gameType === "country_count" ? " 🌍" : "";
+      const seedTag = grp.seeds.length > 1 ? ` (${grp.seeds.length} Seeds)` : "";
       return `
-        <button class="btn" style="${bgStyle} font-size: 0.8rem; padding: 5px 12px; border-radius: 20px;" onclick="selectInspectorMap(${c.seed_number})">
-          🗺️ Map ${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}
+        <button class="btn" style="${bgStyle} font-size: 0.8rem; padding: 5px 12px; border-radius: 20px;" onclick="selectInspectorMap(${grp.mapNumber})">
+          🗺️ Map ${grp.mapNumber}${typeTag}: ${renderFlags(escapeHtml(grp.name))}${seedTag}
         </button>
       `;
     })
     .join("");
 
-  const activeChallenge = inspWeekChallenges.find((c) => c.seed_number === inspSelectedSeed) || inspWeekChallenges[0];
-  if (!activeChallenge) return;
+  const activeGroup = inspCalculatedMapGroups.get(inspSelectedMap) || mapEntries[0];
+  if (!activeGroup) return;
 
-  const pList = inspCalculatedMaps.get(activeChallenge.id) || [];
+  const seedPillsContainer = document.getElementById("inspectorSeedPills");
+  if (seedPillsContainer) {
+    if (activeGroup.seeds.length > 1) {
+      seedPillsContainer.style.display = "flex";
+      const avgBtnStyle =
+        inspSelectedSubSeed === 0
+          ? "background: #00247d; color: white;"
+          : "background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;";
+      const seedBtns = activeGroup.seeds
+        .map((s) => {
+          const sNum = getSubSeedNum(s);
+          const isSel = inspSelectedSubSeed === sNum;
+          const st = isSel
+            ? "background: #0d9488; color: white;"
+            : "background: white; color: #475569; border: 1px solid #cbd5e1;";
+          return `<button class="btn" style="${st} font-size: 0.78rem; padding: 4px 10px;" onclick="selectInspectorSubSeed(${sNum})">Seed ${sNum}</button>`;
+        })
+        .join("");
+
+      seedPillsContainer.innerHTML = `
+        <span style="font-size: 0.8rem; font-weight: bold; color: #64748b;">เลือกดู Seed:</span>
+        <button class="btn" style="${avgBtnStyle} font-size: 0.78rem; padding: 4px 10px;" onclick="selectInspectorSubSeed(0)">
+          📊 ภาพรวม Map (เฉลี่ย ÷ ${activeGroup.seeds.length})
+        </button>
+        ${seedBtns}
+      `;
+    } else {
+      seedPillsContainer.style.display = "none";
+      inspSelectedSubSeed = 1;
+    }
+  }
+
   const thead = document.getElementById("inspectorTableHead");
   const tbody = document.getElementById("inspectorTableBody");
-
   const btnMap = document.getElementById("inspBtnMapSummary");
   const btnRound = document.getElementById("inspBtnRoundDeep");
   const roundPillsContainer = document.getElementById("inspectorRoundPillsContainer");
+  const footerNote = document.getElementById("inspectorFooterNote");
+  const isCountry = activeGroup.gameType === "country_count";
+
+  // โหมดภาพรวม Multi-Seed (เฉลี่ย ÷ N)
+  if (activeGroup.seeds.length > 1 && inspSelectedSubSeed === 0) {
+    btnMap.style.background = "var(--navy-primary)";
+    btnMap.style.color = "white";
+    btnRound.style.background = "#e2e8f0";
+    btnRound.style.color = "#334155";
+    roundPillsContainer.style.display = "none";
+    if (footerNote) {
+      footerNote.textContent = `* คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed) ÷ ${activeGroup.seeds.length} (หากไม่เล่น Seed ไหนจะได้ 0 ใน Seed นั้น)`;
+    }
+
+    const seedHeaders = activeGroup.seeds
+      .map((s) => `<th style="text-align: center; min-width: 90px;">Seed ${getSubSeedNum(s)}</th>`)
+      .join("");
+
+    thead.innerHTML = `
+      <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+        <th style="width: 50px; text-align: center; padding: 8px;">อันดับ</th>
+        <th style="text-align: left; padding: 8px 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
+        ${seedHeaders}
+        <th style="width: 110px; text-align: center; background: #00247d; color: white;">Map Points (÷${activeGroup.seeds.length})</th>
+      </tr>
+    `;
+
+    if (activeGroup.leaderboard.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="${3 + activeGroup.seeds.length}" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = activeGroup.leaderboard
+      .map((p) => {
+        const rankCls = getRankClass(p.mapRank);
+        const seedCols = activeGroup.seeds
+          .map((s) => {
+            const sd = p.seedData[s.id];
+            if (!sd) {
+              return `<td style="text-align: center; color: #cbd5e1;">-</td>`;
+            }
+            const rawTxt = isCountry ? `${sd.raw[5]}/5 🌍` : sd.raw[5].toLocaleString();
+            return `
+              <td style="text-align: center; padding: 6px 4px;">
+                <div style="font-weight: 700; color: #00247d;">${sd.ptsMap} pts</div>
+                <div style="font-size: 0.72rem; color: #64748b;">(${rawTxt})</div>
+              </td>
+            `;
+          })
+          .join("");
+
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td class="col-pos ${rankCls}" style="text-align: center;">${p.mapRank}</td>
+            <td style="padding: 8px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
+            ${seedCols}
+            <td style="text-align: center; font-size: 1.05rem; font-weight: 800; color: #00247d; background: #f8fafc;">
+              ${p.ptsMap}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+    return;
+  }
+
+  // โหมดดูราย Seed (1 Seed หรือเลือกดูเฉพาะ Seed)
+  const activeChallenge =
+    activeGroup.seeds.find((s) => getSubSeedNum(s) === inspSelectedSubSeed) || activeGroup.seeds[0];
+  if (!activeChallenge) return;
+
+  const pList = inspCalculatedSeeds.get(activeChallenge.id) || [];
+
+  if (footerNote) {
+    footerNote.textContent = isCountry
+      ? "* โหมด Country Count: ไม่มี Phantom Score — ถูกประเทศ (1) เทียบ H2H ปกติ, ผิดประเทศหรือได้ Total = 0 ตีตกเป็น 0 แต้มทันที"
+      : "* คำนวณด้วยระบบ Head-to-Head Pairwise (Half-Tie: ชนะ 1 แต้ม, เสมอ 0.5 แต้ม, แพ้ 0 แต้ม) ปัดเศษ Map Points สุทธิ";
+  }
 
   if (inspCurrentSubView === "map") {
     btnMap.style.background = "var(--navy-primary)";
@@ -1918,13 +2395,13 @@ function renderMapInspector() {
         <th style="width: 70px; text-align: center;">R3</th>
         <th style="width: 70px; text-align: center;">R4</th>
         <th style="width: 70px; text-align: center;">R5</th>
-        <th style="width: 90px; text-align: center; background: #eff6ff; color: #1e3a8a;">Total 25k</th>
-        <th style="width: 85px; text-align: center; background: #00247d; color: white;">Map Points</th>
+        <th style="width: 90px; text-align: center; background: #eff6ff; color: #1e3a8a;">${isCountry ? "Total (0-5)" : "Total 25k"}</th>
+        <th style="width: 85px; text-align: center; background: #00247d; color: white;">Seed Points</th>
       </tr>
     `;
 
     if (pList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นใน Seed นี้</td></tr>`;
       return;
     }
 
@@ -1932,14 +2409,19 @@ function renderMapInspector() {
       .map((p) => {
         const rankCls = getRankClass(p.mapRank);
         const roundCells = [0, 1, 2, 3, 4]
-          .map(
-            (rIdx) => `
+          .map((rIdx) => {
+            const rawDisplay = isCountry
+              ? p.raw[rIdx] === 1
+                ? "✅ 1"
+                : "❌ 0"
+              : p.raw[rIdx].toLocaleString();
+            return `
             <td style="text-align: center; padding: 6px 4px; border-bottom: 1px solid #e2e8f0;">
-              <div style="font-weight: 600; color: #334155;">${p.raw[rIdx].toLocaleString()}</div>
+              <div style="font-weight: 600; color: #334155;">${rawDisplay}</div>
               <div style="font-size: 0.73rem; color: #16a34a; font-weight: 700;">+${p.points[rIdx]} pts</div>
             </td>
-          `
-          )
+          `;
+          })
           .join("");
 
         return `
@@ -1949,7 +2431,7 @@ function renderMapInspector() {
             <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
             ${roundCells}
             <td style="text-align: center; padding: 6px 4px; background: #eff6ff;">
-              <div style="font-weight: 700; color: #1e3a8a;">${p.raw[5].toLocaleString()}</div>
+              <div style="font-weight: 700; color: #1e3a8a;">${isCountry ? `${p.raw[5]} / 5` : p.raw[5].toLocaleString()}</div>
               <div style="font-size: 0.73rem; color: #1e3a8a; font-weight: 700;">+${p.points[5]} pts</div>
             </td>
             <td style="text-align: center; font-size: 1.05rem; font-weight: 800; color: #00247d; background: #f8fafc;">
@@ -1979,22 +2461,21 @@ function renderMapInspector() {
     });
 
     const m = inspSelectedRound;
-    const roundTitle = m < 5 ? `Round ${m + 1} (เต็ม 5,000 คะแนน)` : `Total Score (เต็ม 25,000 คะแนน)`;
 
     thead.innerHTML = `
       <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
         <th style="width: 50px; text-align: center; padding: 8px;">อันดับ</th>
         <th style="text-align: left; padding: 8px 12px; width: 160px;">ผู้เล่น (Pseudo)</th>
         <th style="width: 110px; text-align: center; color: #475569;">เวลาที่เล่น</th>
-        <th style="width: 95px; text-align: center;">คะแนนดิบ (Raw)</th>
-        <th style="width: 105px; text-align: center; background: #eff6ff; color: #1e3a8a;">Phantom (10%)</th>
-        <th style="text-align: left; padding: 8px 12px;">ผลการเจอกับคู่แข่งอีก ${pList.length - 1} คน (H2H)</th>
+        <th style="width: 95px; text-align: center;">${isCountry ? "ผลทาย" : "คะแนนดิบ (Raw)"}</th>
+        <th style="width: 105px; text-align: center; background: #eff6ff; color: #1e3a8a;">${isCountry ? "Phantom" : "Phantom (10%)"}</th>
+        <th style="text-align: left; padding: 8px 12px;">ผลการเจอกับคู่แข่งอีก ${Math.max(0, pList.length - 1)} คน (H2H)</th>
         <th style="width: 95px; text-align: center; background: #00247d; color: white;">แต้มรอบนี้</th>
       </tr>
     `;
 
     if (pList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding: 30px; text-align: center; color: #94a3b8;">ยังไม่มีผู้เล่นใน Seed นี้</td></tr>`;
       return;
     }
 
@@ -2008,32 +2489,52 @@ function renderMapInspector() {
       .map((p) => {
         const rankCls = getRankClass(p.roundRank);
         const h = p.h2h[m] || { wins: 0, ties: 0, losses: 0 };
-        const phantomVal = p.phantoms[m] !== undefined ? p.phantoms[m].toFixed(1) : "-";
+        const phantomVal = isCountry
+          ? "ไม่มี (0%)"
+          : p.phantoms[m] !== undefined
+            ? p.phantoms[m].toFixed(1)
+            : "-";
+        const rawDisplay = isCountry
+          ? m < 5
+            ? p.raw[m] === 1
+              ? "✅ ถูก (1)"
+              : "❌ ผิด (0)"
+            : `${p.raw[m]} / 5`
+          : p.raw[m].toLocaleString();
 
-        let outcomeBadge = `
-          <span style="display: inline-block; background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">
-            ชนะ ${h.wins}
-          </span>
-        `;
-        if (h.ties > 0) {
+        let outcomeBadge = "";
+        if (h.zeroed) {
+          outcomeBadge = `
+            <span style="display: inline-block; background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">
+              ได้ 0 → ตีตก 0 แต้มทันที
+            </span>
+          `;
+        } else {
+          outcomeBadge = `
+            <span style="display: inline-block; background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">
+              ชนะ ${h.wins}
+            </span>
+          `;
+          if (h.ties > 0) {
+            outcomeBadge += `
+              <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; margin-left: 4px;">
+                เสมอ ${h.ties}
+              </span>
+            `;
+          }
           outcomeBadge += `
-            <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; margin-left: 4px;">
-              เสมอ ${h.ties}
+            <span style="display: inline-block; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; margin-left: 4px;">
+              แพ้ ${h.losses}
             </span>
           `;
         }
-        outcomeBadge += `
-          <span style="display: inline-block; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; margin-left: 4px;">
-            แพ้ ${h.losses}
-          </span>
-        `;
 
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
             <td class="col-pos ${rankCls}" style="text-align: center;">${p.roundRank}</td>
             <td style="padding: 8px 12px; font-weight: 600; color: #1e293b;">${escapeHtml(p.username)}</td>
             <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
-            <td style="text-align: center; font-weight: 700; color: #0f172a;">${p.raw[m].toLocaleString()}</td>
+            <td style="text-align: center; font-weight: 700; color: #0f172a;">${rawDisplay}</td>
             <td style="text-align: center; font-weight: 700; color: #1e3a8a; background: #f0f7ff;">${phantomVal}</td>
             <td style="padding: 8px 12px;">${outcomeBadge}</td>
             <td style="text-align: center; font-weight: 800; font-size: 1rem; color: #15803d; background: #f8fafc;">

@@ -96,6 +96,9 @@
           <div id="rawMapSelectorPills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
         </div>
 
+        <!-- Seed Selector Pills (Visible when selected Map has > 1 Seed) -->
+        <div id="rawSeedSelectorContainer" class="raw-controls-bar" style="display: none; background: #f1f5f9; padding: 8px 16px;"></div>
+
         <!-- Sub-View Switcher (Map Summary vs Round Deep-Dive) -->
         <div class="raw-subview-bar">
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
@@ -129,7 +132,7 @@
         </table>
 
         <!-- Calculation footnote -->
-        <div style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid var(--table-border); font-size: 0.8rem; color: #64748b;">
+        <div id="rawCalcFootnote" style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid var(--table-border); font-size: 0.8rem; color: #64748b;">
           * คำนวณด้วยระบบ Pairwise Head-to-Head (Half-Tie: ชนะ 1 แต้ม, เสมอ 0.5 แต้ม, แพ้ 0 แต้ม) เทียบกับ Phantom Score (บวก 10% ของคะแนนที่ขาด) ของคู่แข่งทุกคนในรอบนั้น
         </div>
       </div>

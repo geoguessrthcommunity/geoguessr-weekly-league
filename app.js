@@ -11,12 +11,49 @@ let currentCalculatedData = null;
 let seasonStandingsCache = null;
 
 let currentMainView = "leaderboard"; // "leaderboard" | "raw"
-let selectedRawSeed = 1; // 1 to 7
+let selectedRawSeed = 1; // Map number 1 to 7
+let selectedRawSubSeed = 0; // 0 = Map Overview (multi-seed), 1..N = specific seed
 let selectedRawSubView = "map"; // "map" | "round"
-let selectedRawRound = 0; // 0..4 = R1..R5, 5 = Total 25k
+let selectedRawRound = 0; // 0..4 = R1..R5, 5 = Total
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
+
+function getMapNum(c) {
+  return Number(c?.map_number || c?.seed_number || 0);
+}
+
+function getSubSeedNum(c) {
+  return Number(c?.sub_seed_number || 1);
+}
+
+function getGameType(c) {
+  return c?.game_type || "standard";
+}
+
+function sortChallenges(list) {
+  return [...(list || [])].sort(
+    (a, b) => getMapNum(a) - getMapNum(b) || getSubSeedNum(a) - getSubSeedNum(b)
+  );
+}
+
+function groupChallengesByMap(challenges) {
+  const sorted = sortChallenges(challenges);
+  const byMap = new Map();
+  sorted.forEach((c) => {
+    const m = getMapNum(c);
+    if (!byMap.has(m)) {
+      byMap.set(m, {
+        mapNumber: m,
+        name: c.name || `Map ${m}`,
+        gameType: getGameType(c),
+        seeds: [],
+      });
+    }
+    byMap.get(m).seeds.push(c);
+  });
+  return Array.from(byMap.values()).sort((a, b) => a.mapNumber - b.mapNumber);
+}
 
 if (CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT_ID")) {
   db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -43,13 +80,20 @@ const viewBtnRaw = document.getElementById("viewBtnRaw");
 const leaderboardView = document.getElementById("leaderboardView");
 const rawScoresView = document.getElementById("rawScoresView");
 const rawMapSelectorPills = document.getElementById("rawMapSelectorPills");
+const rawSeedSelectorContainer = document.getElementById("rawSeedSelectorContainer");
 const rawTableHead = document.getElementById("rawTableHead");
 const rawTableBody = document.getElementById("rawTableBody");
 const rawBtnMapSummary = document.getElementById("rawBtnMapSummary");
 const rawBtnRoundDeep = document.getElementById("rawBtnRoundDeep");
 const rawRoundSelectorContainer = document.getElementById("rawRoundSelectorContainer");
+const rawCalcFootnote = document.getElementById("rawCalcFootnote");
 
 const formatNum = (num) => (num !== undefined && num !== null ? Number(num).toLocaleString() : "-");
+const formatPts = (num) => {
+  if (num === undefined || num === null) return "-";
+  const rounded = Math.round(Number(num) * 10) / 10;
+  return rounded.toLocaleString(undefined, { maximumFractionDigits: 1 });
+};
 
 function formatRankDisplay(rank, total) {
   if (rank === undefined || rank === null || rank === "-") return "-";
@@ -109,6 +153,10 @@ async function init() {
         }
         return true; // Ongoing active competition
       }
+      // สัปดาห์ที่ตั้ง start_date ไว้และถึงเวลาเริ่มแล้ว (เปิดแข่งต่อเนื่องทันที)
+      if (!w.is_active && !w.is_frozen && w.start_date && new Date(w.start_date) <= now) {
+        return true;
+      }
       return false; // Draft / upcoming week
     });
 
@@ -138,7 +186,12 @@ async function init() {
     allWeeks = visibleWeeks;
     renderBottomTabs();
 
-    const defaultWeek = allWeeks.find((w) => w.is_active) || allWeeks[0];
+    const defaultWeek =
+      allWeeks.find(
+        (w) =>
+          (w.is_active && (!w.start_date || new Date(w.start_date) <= now)) ||
+          (!w.is_frozen && w.start_date && new Date(w.start_date) <= now)
+      ) || allWeeks[0];
     await selectWeek(defaultWeek.id);
 
     // Setup Supabase Realtime Listener (debounced)
@@ -215,14 +268,14 @@ async function selectWeek(weekId) {
     currentMainView = "leaderboard";
   }
 
-  // Load Challenges (7 Seeds)
+  // Load Challenges (7 Maps, each may have 1..N seeds)
   const { data: challenges } = await db
     .from("challenges")
     .select("*")
     .eq("week_id", weekId)
     .order("seed_number", { ascending: true });
 
-  currentChallenges = challenges || [];
+  currentChallenges = sortChallenges(challenges || []);
   renderMapCards(currentChallenges);
   renderTableHeaders(currentChallenges);
 
@@ -410,33 +463,67 @@ window.setRulesLang = function (lang) {
   }
 };
 
+function renderMapLinksHtml(seeds, isHeaderCard = false) {
+  if (!seeds || seeds.length === 0) return "";
+  if (seeds.length === 1) {
+    const c = seeds[0];
+    const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
+    return hasUrl
+      ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn">▶ Play</a>`
+      : `<span class="map-btn" style="opacity: 0.55; cursor: not-allowed; background: #64748b; font-size: ${isHeaderCard ? "0.75rem" : "0.8rem"};">🔒 Soon</span>`;
+  }
+
+  return `
+    <div class="map-links-group">
+      ${seeds
+        .map((c) => {
+          const sNum = getSubSeedNum(c);
+          const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
+          return hasUrl
+            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn multi" title="Play Seed ${sNum}">▶ S${sNum}</a>`
+            : `<span class="map-btn multi" style="opacity: 0.55; cursor: not-allowed; background: #64748b;" title="Seed ${sNum} Soon">🔒 S${sNum}</span>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderMapMetaBadgesHtml(grp) {
+  const pills = [];
+  if (grp.gameType === "country_count") {
+    pills.push(`<span class="map-meta-pill">🌍 Country</span>`);
+  }
+  if (grp.seeds.length > 1) {
+    pills.push(`<span class="map-meta-pill">${grp.seeds.length} Seeds</span>`);
+  }
+  if (pills.length === 0) return "";
+  return `<div class="map-meta-badges">${pills.join("")}</div>`;
+}
+
 /**
  * 6. Render the 7 Map Cards
  */
 function renderMapCards(challenges) {
   if (!mapsGrid) return;
-  if (!challenges.length) {
+  const mapGroups = groupChallengesByMap(challenges);
+  if (!mapGroups.length) {
     mapsGrid.innerHTML = `<div style="grid-column: span 7; color: white; text-align: center;">No map data available</div>`;
     return;
   }
 
-  mapsGrid.innerHTML = challenges
-    .map((c) => {
-      const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
-      return `
+  mapsGrid.innerHTML = mapGroups
+    .map(
+      (grp) => `
       <div class="map-card">
         <div>
-          <div class="map-title">Map ${c.seed_number}</div>
-          <div class="map-desc">${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}</div>
+          <div class="map-title">Map ${grp.mapNumber}</div>
+          <div class="map-desc">${renderFlags(escapeHtml(grp.name))}</div>
+          ${renderMapMetaBadgesHtml(grp)}
         </div>
-        ${
-          hasUrl
-            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn">▶ Play</a>`
-            : `<span class="map-btn" style="opacity: 0.55; cursor: not-allowed; background: #64748b; font-size: 0.8rem;">🔒 Soon</span>`
-        }
+        ${renderMapLinksHtml(grp.seeds, false)}
       </div>
-    `;
-    })
+    `
+    )
     .join("");
 }
 
@@ -463,24 +550,20 @@ function renderTableHeaders(challenges) {
     <th class="th-sub col-total">Points</th>
   `;
 
-  challenges.forEach((c) => {
-    const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
-    const mapName = c.name || `Seed ${c.seed_number}`;
+  const mapGroups = groupChallengesByMap(challenges);
 
+  mapGroups.forEach((grp) => {
     tableTopHeaderRow.insertAdjacentHTML(
       "beforeend",
       `
-      <th class="th-top-map m${c.seed_number}" colspan="2">
+      <th class="th-top-map m${grp.mapNumber}" colspan="2">
         <div class="table-map-card">
           <div class="map-card-info">
-            <div class="map-card-title">Map ${c.seed_number}</div>
-            <div class="map-card-desc">${renderFlags(escapeHtml(mapName))}</div>
+            <div class="map-card-title">Map ${grp.mapNumber}</div>
+            <div class="map-card-desc">${renderFlags(escapeHtml(grp.name))}</div>
+            ${renderMapMetaBadgesHtml(grp)}
           </div>
-          ${
-            hasUrl
-              ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn">▶ Play</a>`
-              : `<span class="map-btn" style="opacity: 0.55; cursor: not-allowed; background: #64748b; font-size: 0.75rem;">🔒 Soon</span>`
-          }
+          ${renderMapLinksHtml(grp.seeds, true)}
         </div>
       </th>
     `
@@ -497,14 +580,104 @@ function renderTableHeaders(challenges) {
 }
 
 /**
- * 8. Reusable Week Calculation (Phantom Score 10% Threshold Algorithm)
+ * 8. Single-Seed Scoring Helper (supports both 'standard' and 'country_count')
+ */
+function scoreSingleSeed(pList, gameType = "standard") {
+  if (!pList || pList.length === 0) return [];
+  const isCountryCount = gameType === "country_count";
+
+  for (let m = 0; m < 6; m++) {
+    const maxScore = isCountryCount ? (m < 5 ? 1 : 5) : (m < 5 ? 5000 : 25000);
+
+    pList.forEach((p) => {
+      p.points = p.points || [];
+      p.phantoms = p.phantoms || [];
+      p.h2h = p.h2h || [];
+
+      const raw = p.raw[m];
+      if (isCountryCount) {
+        p.phantoms[m] = raw; // No Phantom Score
+      } else {
+        const missing = Math.max(0, maxScore - raw);
+        p.phantoms[m] = raw + 0.1 * missing;
+      }
+    });
+
+    pList.forEach((p, i) => {
+      let ptsInRound = 0;
+      let wins = 0;
+      let ties = 0;
+      let losses = 0;
+      const pRaw = p.raw[m];
+      const pPhan = p.phantoms[m];
+
+      if (isCountryCount && pRaw === 0) {
+        // Country Count: 0 in round (or 0 total) automatically receives 0 points (no half-ties with other 0s)
+        pList.forEach((opp, j) => {
+          if (i === j) return;
+          if (opp.raw[m] > 0) losses += 1;
+        });
+        p.points[m] = 0;
+        p.h2h[m] = { wins: 0, ties: 0, losses, zeroed: true };
+      } else {
+        pList.forEach((opp, j) => {
+          if (i === j) return;
+          const oppRaw = opp.raw[m];
+          const oppPhan = opp.phantoms[m];
+
+          if (isCountryCount) {
+            if (pRaw > oppRaw) {
+              ptsInRound += 1;
+              wins += 1;
+            } else if (pRaw === oppRaw) {
+              ptsInRound += 0.5;
+              ties += 1;
+            } else {
+              losses += 1;
+            }
+          } else {
+            if (pRaw > oppPhan && oppRaw <= pPhan) {
+              ptsInRound += 1;
+              wins += 1;
+            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
+              ptsInRound += 0.5;
+              ties += 1;
+            } else {
+              losses += 1;
+            }
+          }
+        });
+
+        p.points[m] = ptsInRound;
+        p.h2h[m] = { wins, ties, losses, zeroed: false };
+      }
+    });
+  }
+
+  pList.forEach((p) => {
+    p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
+    p.ptsMap = Math.round(p.ptsRounds);
+  });
+
+  pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
+  pList.forEach((p, idx) => {
+    const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
+    p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
+  });
+
+  return pList;
+}
+
+/**
+ * 8.1 Reusable Week Calculation (supports Multi-Seed averaging & Country Count)
  */
 function computeWeekStandings(challenges, scores) {
-  const playersByMap = new Map();
+  const mapGroups = groupChallengesByMap(challenges);
+  const playersBySeed = new Map();
   const allPlayerIds = new Set();
   const playerNames = new Map();
 
-  challenges.forEach((c) => playersByMap.set(c.id, []));
+  challenges.forEach((c) => playersBySeed.set(c.id, []));
 
   scores.forEach((s) => {
     const chId = s.challenge_id;
@@ -514,87 +687,35 @@ function computeWeekStandings(challenges, scores) {
     allPlayerIds.add(uId);
     playerNames.set(uId, uName);
 
-    if (playersByMap.has(chId)) {
-      playersByMap.get(chId).push({
+    if (playersBySeed.has(chId)) {
+      playersBySeed.get(chId).push({
         userId: uId,
         username: uName,
         playedAt: s.played_at || null,
-        raw: [s.r1, s.r2, s.r3, s.r4, s.r5, s.total_score],
+        roundDetails: s.round_details || null,
+        raw: [
+          s.r1,
+          s.r2,
+          s.r3,
+          s.r4,
+          s.r5,
+          s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0)),
+        ],
       });
     }
   });
 
-  const mapResults = new Map();
-
+  // 1. คำนวณคะแนนแยกทีละ Seed (Challenge ID)
+  const seedResultsMap = new Map();
   challenges.forEach((c) => {
-    const pList = playersByMap.get(c.id) || [];
+    const pList = playersBySeed.get(c.id) || [];
     const resultMap = new Map();
 
     if (pList.length > 0) {
-      // 1. Calculate Phantom Score for each of 6 rounds (0..4 = R1..R5 / 5 = Total)
-      for (let m = 0; m < 6; m++) {
-        const maxScore = m < 5 ? 5000 : 25000;
-
-        pList.forEach((p) => {
-          p.points = p.points || [];
-          p.phantoms = p.phantoms || [];
-
-          const raw = p.raw[m];
-          const missing = Math.max(0, maxScore - raw);
-          const phantom = raw + 0.1 * missing;
-
-          p.phantoms[m] = phantom;
-        });
-
-        // 1.1 Pairwise Head-to-Head Scoring with Half-Tie (vs all opponents)
-        pList.forEach((p, i) => {
-          let ptsInRound = 0;
-          let wins = 0;
-          let ties = 0;
-          let losses = 0;
-          const pRaw = p.raw[m];
-          const pPhan = p.phantoms[m];
-
-          pList.forEach((opp, j) => {
-            if (i === j) return; // Do not count self
-            const oppRaw = opp.raw[m];
-            const oppPhan = opp.phantoms[m];
-
-            if (pRaw > oppPhan && oppRaw <= pPhan) {
-              // Win: strictly beats opponent's phantom
-              ptsInRound += 1;
-              wins += 1;
-            } else if (pRaw <= oppPhan && oppRaw <= pPhan) {
-              // Tie: mutually fall within each other's phantom threshold
-              ptsInRound += 0.5;
-              ties += 1;
-            } else {
-              losses += 1;
-            }
-          });
-
-          p.points[m] = ptsInRound;
-          p.h2h = p.h2h || [];
-          p.h2h[m] = { wins, ties, losses };
-        });
-      }
-
-      // 2. Map Points = direct sum of points earned in all 6 rounds (rounded to integer)
-      pList.forEach((p) => {
-        p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
-        p.ptsMap = Math.round(p.ptsRounds);
-      });
-
-      // 3. Rank in map (ptsMap descending, raw total as tie breaker)
-      pList.sort((a, b) => b.ptsMap - a.ptsMap || b.raw[5] - a.raw[5]);
-
-      // Calculate max raw score in each round for this challenge (R1..R5)
+      scoreSingleSeed(pList, getGameType(c));
       const maxRounds = [0, 1, 2, 3, 4].map((m) => Math.max(...pList.map((p) => p.raw[m])));
 
-      pList.forEach((p, idx) => {
-        const isTie = idx > 0 && pList[idx - 1].ptsMap === p.ptsMap;
-        p.mapRank = isTie ? pList[idx - 1].mapRank : idx + 1;
-
+      pList.forEach((p) => {
         let roundWins = 0;
         for (let m = 0; m < 5; m++) {
           if (p.raw[m] === maxRounds[m] && maxRounds[m] > 0) {
@@ -606,6 +727,7 @@ function computeWeekStandings(challenges, scores) {
           userId: p.userId,
           username: p.username,
           playedAt: p.playedAt,
+          roundDetails: p.roundDetails,
           ptsMap: p.ptsMap,
           rank: p.mapRank,
           totalPlayers: pList.length,
@@ -621,25 +743,76 @@ function computeWeekStandings(challenges, scores) {
       });
     }
 
-    mapResults.set(c.id, resultMap);
+    seedResultsMap.set(c.id, resultMap);
   });
 
-  // Grand Total across all challenges in this week
+  // 2. รวมและเฉลี่ยคะแนนระดับ Map (1..7) — ถ้ามี K seeds ให้นำมาบวกกันหาร K
+  const mapResults = new Map(); // mapNumber -> Map(userId -> aggregated map result)
+
+  mapGroups.forEach((grp) => {
+    const seedCount = grp.seeds.length;
+    const aggMap = new Map();
+
+    grp.seeds.forEach((ch) => {
+      const sResMap = seedResultsMap.get(ch.id);
+      if (!sResMap) return;
+      sResMap.forEach((res, uId) => {
+        if (!aggMap.has(uId)) {
+          aggMap.set(uId, {
+            userId: uId,
+            username: res.username,
+            sumPts: 0,
+            sumRaw: 0,
+            seedsPlayed: 0,
+            seedCount,
+            seedResults: {},
+          });
+        }
+        const agg = aggMap.get(uId);
+        agg.sumPts += res.ptsMap;
+        agg.sumRaw += res.raw[5];
+        agg.seedsPlayed += 1;
+        agg.seedResults[ch.id] = res;
+      });
+    });
+
+    const aggList = Array.from(aggMap.values()).map((agg) => ({
+      ...agg,
+      ptsMap: seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10,
+    }));
+
+    aggList.sort((a, b) => b.ptsMap - a.ptsMap || b.sumRaw - a.sumRaw);
+
+    const groupResultMap = new Map();
+    aggList.forEach((p, idx) => {
+      const isTie = idx > 0 && aggList[idx - 1].ptsMap === p.ptsMap;
+      p.rank = isTie ? aggList[idx - 1].rank : idx + 1;
+      p.totalPlayers = aggList.length;
+      p.isMapWin = p.rank === 1;
+      groupResultMap.set(p.userId, p);
+    });
+
+    mapResults.set(grp.mapNumber, groupResultMap);
+  });
+
+  // 3. Grand Total across all 7 Maps in this week
   const leaderboard = [];
 
   allPlayerIds.forEach((uId) => {
     let grandTotal = 0;
     const playerMapStats = {};
 
-    challenges.forEach((c) => {
-      const res = mapResults.get(c.id)?.get(uId);
+    mapGroups.forEach((grp) => {
+      const res = mapResults.get(grp.mapNumber)?.get(uId);
       if (res) {
         grandTotal += res.ptsMap;
-        playerMapStats[c.id] = res;
+        playerMapStats[grp.mapNumber] = res;
       } else {
-        playerMapStats[c.id] = null;
+        playerMapStats[grp.mapNumber] = null;
       }
     });
+
+    grandTotal = Math.round(grandTotal * 10) / 10;
 
     leaderboard.push({
       userId: uId,
@@ -660,16 +833,19 @@ function computeWeekStandings(challenges, scores) {
     }
   }
 
-  return { leaderboard, mapResults, playerNames };
+  return { leaderboard, mapResults, seedResultsMap, mapGroups, playerNames };
 }
 
 /**
- * 8.1 Calculate and render Main Leaderboard Table for Current Week
+ * 8.2 Calculate and render Main Leaderboard Table for Current Week
  */
 function calculateAndRenderScores(scores, challenges) {
-  const { leaderboard, mapResults, playerNames } = computeWeekStandings(challenges, scores);
+  const { leaderboard, mapResults, seedResultsMap, mapGroups, playerNames } = computeWeekStandings(
+    challenges,
+    scores
+  );
 
-  currentCalculatedData = { mapResults, challenges, playerNames, leaderboard };
+  currentCalculatedData = { mapResults, seedResultsMap, mapGroups, challenges, playerNames, leaderboard };
 
   if (leaderboard.length === 0) {
     scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">No players have completed 5 rounds in this week yet.</td></tr>`;
@@ -681,15 +857,15 @@ function calculateAndRenderScores(scores, challenges) {
       const posDisplay = formatRankDisplay(p.overallRank);
       const posClass = `col-pos ${getRankClass(p.overallRank)}`.trim();
 
-      // Count played maps out of total challenges
-      const playedMapsCount = challenges.filter((c) => p.maps[c.id]).length;
-      const totalMapsCount = challenges.length || 7;
+      // Count played maps out of total map groups
+      const playedMapsCount = mapGroups.filter((grp) => p.maps[grp.mapNumber]).length;
+      const totalMapsCount = mapGroups.length || 7;
       const badgeCls = playedMapsCount === totalMapsCount ? "played-badge complete" : "played-badge";
       const playedBadge = `<span class="${badgeCls}" title="Completed ${playedMapsCount} of ${totalMapsCount} maps">[${playedMapsCount}/${totalMapsCount}]</span>`;
 
-      const mapCols = challenges
-        .map((c) => {
-          const mData = p.maps[c.id];
+      const mapCols = mapGroups
+        .map((grp) => {
+          const mData = p.maps[grp.mapNumber];
           if (!mData) {
             return `
               <td class="col-pts" style="color: #cbd5e1;">-</td>
@@ -699,9 +875,17 @@ function calculateAndRenderScores(scores, challenges) {
 
           const rankDisplay = formatRankDisplay(mData.rank);
           const mapRankClass = `col-rank ${getRankClass(mData.rank)}`.trim();
+          const partialSeedTitle =
+            mData.seedCount > 1
+              ? `Played ${mData.seedsPlayed}/${mData.seedCount} seeds (Avg = ${mData.sumPts}/${mData.seedCount})`
+              : "";
+          const partialTag =
+            mData.seedCount > 1 && mData.seedsPlayed < mData.seedCount
+              ? `<span style="font-size:0.65rem;color:#b45309;display:block;">[${mData.seedsPlayed}/${mData.seedCount}]</span>`
+              : "";
 
           return `
-            <td class="col-pts">${formatNum(mData.ptsMap)}</td>
+            <td class="col-pts" title="${escapeHtml(partialSeedTitle)}">${formatPts(mData.ptsMap)}${partialTag}</td>
             <td class="${mapRankClass}">${rankDisplay}</td>
           `;
         })
@@ -713,7 +897,7 @@ function calculateAndRenderScores(scores, challenges) {
           <td class="col-player" title="${escapeHtml(p.username)}">
             <span class="player-name">${escapeHtml(p.username)}</span>${playedBadge}
           </td>
-          <td class="col-total">${formatNum(p.grandTotal)}</td>
+          <td class="col-total">${formatPts(p.grandTotal)}</td>
           ${mapCols}
         </tr>
       `;
@@ -731,21 +915,133 @@ function calculateAndRenderScores(scores, challenges) {
 function renderRawScoresView() {
   if (!currentCalculatedData || !currentChallenges.length) return;
 
-  const { mapResults, challenges } = currentCalculatedData;
+  const { mapResults, seedResultsMap, mapGroups } = currentCalculatedData;
+  if (!mapGroups || !mapGroups.length) return;
 
   // 1. Render Map Pills
   if (rawMapSelectorPills) {
-    rawMapSelectorPills.innerHTML = challenges
-      .map((c) => {
-        const isSel = c.seed_number === selectedRawSeed;
+    rawMapSelectorPills.innerHTML = mapGroups
+      .map((grp) => {
+        const isSel = grp.mapNumber === selectedRawSeed;
+        const typeIcon = grp.gameType === "country_count" ? " 🌍" : "";
+        const seedTag = grp.seeds.length > 1 ? ` (${grp.seeds.length} Seeds)` : "";
         return `
-          <button class="raw-map-pill ${isSel ? "active" : ""}" onclick="selectRawMapSeed(${c.seed_number})">
-            🗺️ Map ${c.seed_number}: ${renderFlags(escapeHtml(c.name || `Seed ${c.seed_number}`))}
+          <button class="raw-map-pill ${isSel ? "active" : ""}" onclick="selectRawMapSeed(${grp.mapNumber})">
+            🗺️ Map ${grp.mapNumber}${typeIcon}: ${renderFlags(escapeHtml(grp.name))}${seedTag}
           </button>
         `;
       })
       .join("");
   }
+
+  const activeGroup = mapGroups.find((g) => g.mapNumber === selectedRawSeed) || mapGroups[0];
+  if (!activeGroup) return;
+
+  const isCountry = activeGroup.gameType === "country_count";
+
+  // 1.1 Seed Selector Pills (visible when selected Map has > 1 seed)
+  if (rawSeedSelectorContainer) {
+    if (activeGroup.seeds.length > 1) {
+      rawSeedSelectorContainer.style.display = "flex";
+      const seedBtns = activeGroup.seeds
+        .map((s) => {
+          const sNum = getSubSeedNum(s);
+          const isSel = selectedRawSubSeed === sNum;
+          return `<button class="raw-map-pill ${isSel ? "active" : ""}" onclick="selectRawSubSeed(${sNum})">Seed ${sNum}</button>`;
+        })
+        .join("");
+
+      rawSeedSelectorContainer.innerHTML = `
+        <strong style="color: #475569; font-size: 0.85rem; margin-right: 4px;">เลือก Seed:</strong>
+        <button class="raw-map-pill ${selectedRawSubSeed === 0 ? "active" : ""}" onclick="selectRawSubSeed(0)">
+          📊 ภาพรวม Map (เฉลี่ย ÷ ${activeGroup.seeds.length})
+        </button>
+        ${seedBtns}
+      `;
+    } else {
+      rawSeedSelectorContainer.style.display = "none";
+      selectedRawSubSeed = 1;
+    }
+  }
+
+  // Multi-seed Overview Mode
+  if (activeGroup.seeds.length > 1 && selectedRawSubSeed === 0) {
+    if (rawBtnMapSummary && rawBtnRoundDeep && rawRoundSelectorContainer) {
+      rawBtnMapSummary.classList.add("active");
+      rawBtnRoundDeep.classList.remove("active");
+      rawRoundSelectorContainer.style.display = "none";
+    }
+
+    if (rawCalcFootnote) {
+      rawCalcFootnote.textContent = `* แมพนี้มีทั้งหมด ${activeGroup.seeds.length} Seeds — คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed) ÷ ${activeGroup.seeds.length}`;
+    }
+
+    const groupResultMap = mapResults.get(activeGroup.mapNumber);
+    const playersList = groupResultMap ? Array.from(groupResultMap.values()) : [];
+
+    if (playersList.length === 0) {
+      if (rawTableHead) rawTableHead.innerHTML = "";
+      if (rawTableBody) {
+        rawTableBody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      }
+      return;
+    }
+
+    const seedHeaders = activeGroup.seeds
+      .map((s) => `<th style="min-width: 95px;">Seed ${getSubSeedNum(s)}</th>`)
+      .join("");
+
+    if (rawTableHead) {
+      rawTableHead.innerHTML = `
+        <tr>
+          <th style="width: 55px;">#</th>
+          <th style="text-align: left; padding-left: 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
+          ${seedHeaders}
+          <th style="width: 115px; background: #00247d; color: white;">Map Points (÷${activeGroup.seeds.length})</th>
+        </tr>
+      `;
+    }
+
+    if (rawTableBody) {
+      rawTableBody.innerHTML = playersList
+        .map((p) => {
+          const rankDisplay = formatRankDisplay(p.rank);
+          const posClass = `col-pos ${getRankClass(p.rank)}`.trim();
+
+          const seedCols = activeGroup.seeds
+            .map((s) => {
+              const sd = p.seedResults[s.id];
+              if (!sd) {
+                return `<td class="raw-cell" style="color: #cbd5e1;">-</td>`;
+              }
+              const rawTxt = isCountry ? `${sd.raw[5]}/5 🌍` : formatNum(sd.raw[5]);
+              return `
+                <td class="raw-cell">
+                  <div class="raw-score-val">${formatPts(sd.ptsMap)} pts</div>
+                  <div class="raw-pts-badge">${rawTxt}</div>
+                </td>
+              `;
+            })
+            .join("");
+
+          return `
+            <tr>
+              <td class="${posClass}">${rankDisplay}</td>
+              <td class="col-player"><span class="player-name">${escapeHtml(p.username)}</span></td>
+              ${seedCols}
+              <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatPts(p.ptsMap)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+    return;
+  }
+
+  // Single-seed (or selected sub-seed) view
+  const activeChallenge =
+    activeGroup.seeds.find((s) => getSubSeedNum(s) === selectedRawSubSeed) || activeGroup.seeds[0];
+  const resultMap = activeChallenge ? seedResultsMap.get(activeChallenge.id) : null;
 
   // 2. Sub-View Button and Round Pill States
   if (rawBtnMapSummary && rawBtnRoundDeep && rawRoundSelectorContainer) {
@@ -760,6 +1056,9 @@ function renderRawScoresView() {
 
       document.querySelectorAll(".raw-round-btn").forEach((btn) => {
         const rnd = parseInt(btn.getAttribute("data-rnd"), 10);
+        if (rnd === 5) {
+          btn.textContent = isCountry ? "Total (0-5)" : "Total (25k)";
+        }
         if (rnd === selectedRawRound) {
           btn.classList.add("active");
         } else {
@@ -769,13 +1068,16 @@ function renderRawScoresView() {
     }
   }
 
-  const activeChallenge = challenges.find((c) => c.seed_number === selectedRawSeed) || challenges[0];
-  const resultMap = mapResults.get(activeChallenge.id);
+  if (rawCalcFootnote) {
+    rawCalcFootnote.textContent = isCountry
+      ? "* โหมด Country Count: ไม่มี Phantom Score — ถูกประเทศ (1) เทียบ Head-to-Head ปกติ, ผิดประเทศหรือได้ Total = 0 จะได้ 0 แต้มในรอบนั้นทันที"
+      : "* คำนวณด้วยระบบ Pairwise Head-to-Head (Half-Tie: ชนะ 1 แต้ม, เสมอ 0.5 แต้ม, แพ้ 0 แต้ม) เทียบกับ Phantom Score (บวก 10% ของคะแนนที่ขาด) ของคู่แข่งทุกคนในรอบนั้น";
+  }
 
   if (!resultMap || resultMap.size === 0) {
     if (rawTableHead) rawTableHead.innerHTML = "";
     if (rawTableBody) {
-      rawTableBody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">ยังไม่มีผู้เล่นในแมพนี้</td></tr>`;
+      rawTableBody.innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">ยังไม่มีผู้เล่นใน Seed นี้</td></tr>`;
     }
     return;
   }
@@ -783,7 +1085,6 @@ function renderRawScoresView() {
   const playersList = Array.from(resultMap.values());
 
   if (selectedRawSubView === "map") {
-    // Sub-view 1: Map Leaderboard Summary
     if (rawTableHead) {
       rawTableHead.innerHTML = `
         <tr>
@@ -795,8 +1096,8 @@ function renderRawScoresView() {
           <th style="width: 85px;">Round 3</th>
           <th style="width: 85px;">Round 4</th>
           <th style="width: 85px;">Round 5</th>
-          <th style="width: 110px; background: #eff6ff; color: #1e3a8a;">Total (25k)</th>
-          <th style="width: 95px; background: #00247d; color: white;">Map Points</th>
+          <th style="width: 110px; background: #eff6ff; color: #1e3a8a;">${isCountry ? "Total (0-5)" : "Total (25k)"}</th>
+          <th style="width: 95px; background: #00247d; color: white;">${activeGroup.seeds.length > 1 ? "Seed Points" : "Map Points"}</th>
         </tr>
       `;
     }
@@ -813,10 +1114,21 @@ function renderRawScoresView() {
             .map((rIdx) => {
               const rawVal = p.raw[rIdx];
               const ptsVal = p.points[rIdx];
+              let rawDisplay = formatNum(rawVal);
+              let titleAttr = "";
+              if (isCountry) {
+                const det = Array.isArray(p.roundDetails) ? p.roundDetails[rIdx] : null;
+                rawDisplay = rawVal === 1 ? "✅ 1" : "❌ 0";
+                if (det?.target) {
+                  titleAttr = det.ok
+                    ? `Target: ${det.target} (Correct)`
+                    : `Target: ${det.target}, Guess: ${det.guess || "None"}`;
+                }
+              }
               return `
-                <td class="raw-cell">
-                  <div class="raw-score-val">${formatNum(rawVal)}</div>
-                  <div class="raw-pts-badge">+${formatNum(ptsVal)} pts</div>
+                <td class="raw-cell" title="${escapeHtml(titleAttr)}">
+                  <div class="raw-score-val">${rawDisplay}</div>
+                  <div class="raw-pts-badge">+${formatPts(ptsVal)} pts</div>
                 </td>
               `;
             })
@@ -826,8 +1138,8 @@ function renderRawScoresView() {
           const totalPts = p.points[5];
           const totalCell = `
             <td class="raw-cell" style="background: #eff6ff;">
-              <div class="raw-score-val" style="color: #1e3a8a;">${formatNum(totalRaw)}</div>
-              <div class="raw-pts-badge" style="background: #bfdbfe; color: #1e3a8a;">+${formatNum(totalPts)} pts</div>
+              <div class="raw-score-val" style="color: #1e3a8a;">${isCountry ? `${totalRaw} / 5` : formatNum(totalRaw)}</div>
+              <div class="raw-pts-badge" style="background: #bfdbfe; color: #1e3a8a;">+${formatPts(totalPts)} pts</div>
             </td>
           `;
 
@@ -840,14 +1152,14 @@ function renderRawScoresView() {
               <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
               ${roundCells}
               ${totalCell}
-              <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatNum(p.ptsMap)}</td>
+              <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatPts(p.ptsMap)}</td>
             </tr>
           `;
         })
         .join("");
     }
   } else {
-    // Sub-view 2: Round Deep-Dive (Phantom Score & Pairwise H2H Breakdown)
+    // Sub-view 2: Round Deep-Dive
     const m = selectedRawRound;
 
     if (rawTableHead) {
@@ -856,9 +1168,9 @@ function renderRawScoresView() {
           <th style="width: 55px;">#</th>
           <th style="text-align: left; padding-left: 12px; width: 170px;">ผู้เล่น (Pseudo)</th>
           <th style="width: 110px; text-align: center;">เวลาที่เล่น</th>
-          <th style="width: 110px; text-align: center;">คะแนนดิบ (Raw)</th>
-          <th style="width: 120px; text-align: center; background: #eff6ff; color: #1e3a8a;">Phantom (10%)</th>
-          <th style="text-align: left; padding-left: 12px;">ผลการเจอกับคู่แข่งอีก ${playersList.length - 1} คน (H2H)</th>
+          <th style="width: 110px; text-align: center;">${isCountry ? "ผลทาย" : "คะแนนดิบ (Raw)"}</th>
+          <th style="width: 120px; text-align: center; background: #eff6ff; color: #1e3a8a;">${isCountry ? "Phantom" : "Phantom (10%)"}</th>
+          <th style="text-align: left; padding-left: 12px;">ผลการเจอกับคู่แข่งอีก ${Math.max(0, playersList.length - 1)} คน (H2H)</th>
           <th style="width: 110px; text-align: center; background: #00247d; color: white;">แต้มรอบนี้</th>
         </tr>
       `;
@@ -875,25 +1187,45 @@ function renderRawScoresView() {
         .map((p) => {
           const rankCls = `col-pos ${getRankClass(p.roundRank)}`.trim();
           const h = p.h2h?.[m] || { wins: 0, ties: 0, losses: 0 };
-          const phantomVal = p.phantoms?.[m] !== undefined ? p.phantoms[m].toFixed(1) : "-";
+          const phantomVal = isCountry
+            ? "ไม่มี (0%)"
+            : p.phantoms?.[m] !== undefined
+              ? p.phantoms[m].toFixed(1)
+              : "-";
+          const rawDisplay = isCountry
+            ? m < 5
+              ? p.raw[m] === 1
+                ? "✅ ถูก (1)"
+                : "❌ ผิด (0)"
+              : `${p.raw[m]} / 5`
+            : formatNum(p.raw[m]);
 
-          let outcomeBadge = `
-            <span style="display: inline-block; background: #dcfce7; color: #15803d; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.78rem;">
-              ชนะ ${h.wins}
-            </span>
-          `;
-          if (h.ties > 0) {
+          let outcomeBadge = "";
+          if (h.zeroed) {
+            outcomeBadge = `
+              <span style="display: inline-block; background: #fee2e2; color: #b91c1c; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.78rem;">
+                ได้ 0 → ตีตก 0 แต้มทันที
+              </span>
+            `;
+          } else {
+            outcomeBadge = `
+              <span style="display: inline-block; background: #dcfce7; color: #15803d; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.78rem;">
+                ชนะ ${h.wins}
+              </span>
+            `;
+            if (h.ties > 0) {
+              outcomeBadge += `
+                <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.78rem; margin-left: 4px;">
+                  เสมอ ${h.ties}
+                </span>
+              `;
+            }
             outcomeBadge += `
-              <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.78rem; margin-left: 4px;">
-                เสมอ ${h.ties}
+              <span style="display: inline-block; background: #f1f5f9; color: #64748b; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 0.78rem; margin-left: 4px;">
+                แพ้ ${h.losses}
               </span>
             `;
           }
-          outcomeBadge += `
-            <span style="display: inline-block; background: #f1f5f9; color: #64748b; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 0.78rem; margin-left: 4px;">
-              แพ้ ${h.losses}
-            </span>
-          `;
 
           return `
             <tr>
@@ -902,11 +1234,11 @@ function renderRawScoresView() {
                 <span class="player-name">${escapeHtml(p.username)}</span>
               </td>
               <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
-              <td style="text-align: center; font-weight: 700; color: #0f172a;">${formatNum(p.raw[m])}</td>
+              <td style="text-align: center; font-weight: 700; color: #0f172a;">${rawDisplay}</td>
               <td style="text-align: center; font-weight: 700; color: #1e3a8a; background: #f0f7ff;">${phantomVal}</td>
               <td style="padding: 8px 12px; text-align: left;">${outcomeBadge}</td>
               <td style="text-align: center; font-weight: 800; font-size: 1rem; color: #15803d; background: #f8fafc;">
-                +${formatNum(p.points[m])} pts
+                +${formatPts(p.points[m])} pts
               </td>
             </tr>
           `;
@@ -916,8 +1248,15 @@ function renderRawScoresView() {
   }
 }
 
-window.selectRawMapSeed = function (seedNum) {
-  selectedRawSeed = seedNum;
+window.selectRawMapSeed = function (mapNum) {
+  selectedRawSeed = mapNum;
+  const grp = currentCalculatedData?.mapGroups?.find((g) => g.mapNumber === mapNum);
+  selectedRawSubSeed = grp && grp.seeds.length > 1 ? 0 : 1;
+  renderRawScoresView();
+};
+
+window.selectRawSubSeed = function (subSeedNum) {
+  selectedRawSubSeed = subSeedNum;
   renderRawScoresView();
 };
 
@@ -1009,7 +1348,7 @@ async function loadAndRenderSeasonStandings() {
       const wChIds = new Set(wChallenges.map((c) => c.id));
       const wScores = (scores || []).filter((s) => wChIds.has(s.challenge_id));
 
-      const { leaderboard, mapResults } = computeWeekStandings(wChallenges, wScores);
+      const { leaderboard, mapResults, seedResultsMap } = computeWeekStandings(wChallenges, wScores);
       const N = leaderboard.length;
 
       leaderboard.forEach((p) => {
@@ -1041,7 +1380,7 @@ async function loadAndRenderSeasonStandings() {
         else if (p.overallRank === 3) cp.podiums.bronze++;
       });
 
-      weeklyStandingsMap.set(w.id, { leaderboard, mapResults, N });
+      weeklyStandingsMap.set(w.id, { leaderboard, mapResults, seedResultsMap, N });
     });
 
     const finalSeasonList = Array.from(playerCumulative.values()).sort(
@@ -1194,19 +1533,30 @@ window.openPlayerProfile = async function (userId) {
     let countMapWins = 0;
     let countRoundWins = 0;
     const uniqueWeeks = new Set();
+    const countedMapWins = new Set(); // weekId:mapNumber
 
     userScores.forEach((s) => {
-      [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
-        if (r === 5000) count5k++;
-      });
-      if (s.total_score === 25000) count25k++;
-      if (s.challenges?.week_id) uniqueWeeks.add(s.challenges.week_id);
+      const ch = s.challenges || {};
+      const gType = getGameType(ch);
+      if (gType !== "country_count") {
+        [s.r1, s.r2, s.r3, s.r4, s.r5].forEach((r) => {
+          if (r === 5000) count5k++;
+        });
+        if (s.total_score === 25000) count25k++;
+      }
+      if (ch.week_id) uniqueWeeks.add(ch.week_id);
 
-      const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(s.challenges?.week_id);
-      const mapRes = wkStandings?.mapResults?.get(s.challenge_id)?.get(userId);
-      if (mapRes) {
-        if (mapRes.isMapWin) countMapWins++;
-        countRoundWins += mapRes.roundWins || 0;
+      const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(ch.week_id);
+      const mapNum = getMapNum(ch);
+      const mapGroupRes = wkStandings?.mapResults?.get(mapNum)?.get(userId);
+      const mapWinKey = `${ch.week_id}:${mapNum}`;
+      if (mapGroupRes?.isMapWin && !countedMapWins.has(mapWinKey)) {
+        countedMapWins.add(mapWinKey);
+        countMapWins++;
+      }
+      const seedRes = wkStandings?.seedResultsMap?.get(s.challenge_id)?.get(userId);
+      if (seedRes) {
+        countRoundWins += seedRes.roundWins || 0;
       }
     });
 
@@ -1220,31 +1570,37 @@ window.openPlayerProfile = async function (userId) {
       const wA = a.challenges?.week_id || 0;
       const wB = b.challenges?.week_id || 0;
       if (wB !== wA) return wB - wA;
-      return (a.challenges?.seed_number || 0) - (b.challenges?.seed_number || 0);
+      return getMapNum(a.challenges) - getMapNum(b.challenges) || getSubSeedNum(a.challenges) - getSubSeedNum(b.challenges);
     });
 
     modalHistoryTableBody.innerHTML = userScores
       .map((s) => {
         const ch = s.challenges || {};
         const wk = ch.weeks || {};
-        const modeInfo = detectMapMode(ch.name);
+        const isCountry = getGameType(ch) === "country_count";
+        const modeInfo = isCountry ? { label: "Country", cls: "other" } : detectMapMode(ch.name);
         const total = s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0));
 
         let ptsMapDisplay = "-";
         let rankMapDisplay = "-";
 
         const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(ch.week_id);
-        const mapRes = wkStandings?.mapResults?.get(ch.id)?.get(userId);
+        const seedRes = wkStandings?.seedResultsMap?.get(ch.id)?.get(userId);
 
         let rankCls = "";
-        if (mapRes) {
-          ptsMapDisplay = formatNum(mapRes.ptsMap);
-          rankMapDisplay = formatRankDisplay(mapRes.rank, mapRes.totalPlayers);
-          rankCls = getRankClass(mapRes.rank);
+        if (seedRes) {
+          ptsMapDisplay = formatPts(seedRes.ptsMap);
+          rankMapDisplay = formatRankDisplay(seedRes.rank, seedRes.totalPlayers);
+          rankCls = getRankClass(seedRes.rank);
         }
 
-        const maxR = mapRes?.maxRounds || [];
+        const maxR = seedRes?.maxRounds || [];
         const renderR = (val, idx) => {
+          if (isCountry) {
+            return Number(val) === 1
+              ? `<span style="font-weight: 700; color: #15803d;">✅ 1</span>`
+              : `<span style="color: #94a3b8;">❌ 0</span>`;
+          }
           const isWin = maxR[idx] !== undefined && val === maxR[idx] && maxR[idx] > 0;
           if (isWin) {
             return `<span style="font-weight: 700; color: #15803d;" title="Round ${idx + 1} Best Score in this seed!">★ ${formatNum(val)}</span>`;
@@ -1252,11 +1608,15 @@ window.openPlayerProfile = async function (userId) {
           return formatNum(val);
         };
 
+        const mNum = getMapNum(ch);
+        const sNum = getSubSeedNum(ch);
+        const seedSubText = sNum > 1 ? ` (S${sNum})` : "";
+
         return `
           <tr>
             <td style="font-weight: 600; color: #475569;">${escapeHtml(wk.title || `W${ch.week_id}`)}</td>
             <td style="text-align: left; padding-left: 10px;">
-              <strong>M${ch.seed_number}:</strong> ${renderFlags(escapeHtml(ch.name || `Seed ${ch.seed_number}`))}
+              <strong>M${mNum}${seedSubText}:</strong> ${renderFlags(escapeHtml(ch.name || `Map ${mNum}`))}
             </td>
             <td><span class="mode-tag ${modeInfo.cls}">${modeInfo.label}</span></td>
             <td>${renderR(s.r1, 0)}</td>
@@ -1264,7 +1624,7 @@ window.openPlayerProfile = async function (userId) {
             <td>${renderR(s.r3, 2)}</td>
             <td>${renderR(s.r4, 3)}</td>
             <td>${renderR(s.r5, 4)}</td>
-            <td style="background: #eff6ff; font-weight: 700; color: #1e3a8a;">${formatNum(total)}</td>
+            <td style="background: #eff6ff; font-weight: 700; color: #1e3a8a;">${isCountry ? `${total}/5` : formatNum(total)}</td>
             <td style="background: #00247d; color: white; font-weight: 700;">${ptsMapDisplay}</td>
             <td class="${rankCls}">${rankMapDisplay}</td>
           </tr>

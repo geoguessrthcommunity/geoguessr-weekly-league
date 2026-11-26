@@ -15,6 +15,7 @@ if (typeof globalThis.WebSocket === "undefined") {
 }
 
 const { createClient } = require("@supabase/supabase-js");
+const { checkRoundCountryMatch } = require("./country-lookup");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -133,19 +134,30 @@ function formatBangkokTime(isoString) {
   }
 }
 
+function getChallengeLabel(challenge) {
+  const mapNum = challenge.map_number || challenge.seed_number;
+  const subSeed = challenge.sub_seed_number || 1;
+  const mapName = challenge.name || `Map ${mapNum}`;
+  const seedSuffix = challenge.hasMultiSeed || subSeed > 1 ? ` (Seed ${subSeed})` : "";
+  const typeTag = challenge.game_type === "country_count" ? " [Country Count]" : "";
+  return `Map ${mapNum}${seedSuffix}: ${mapName}${typeTag}`;
+}
+
 /**
- * สร้าง Embed แจ้งเตือนคะแนนรายบุคคล (รองรับคะแนนใหม่, อัปเดต, และ 25,000 Perfect Score)
+ * สร้าง Embed แจ้งเตือนคะแนนรายบุคคล (รองรับคะแนนใหม่, อัปเดต, และ Perfect Score ทั้งโหมดปกติและ Country Count)
  */
 function createScoreEmbed(challenge, week, player, isUpdate = false, oldScore = null) {
-  const is25k = Number(player.total) === 25000;
-  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
-  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const isCountryCount = challenge.game_type === "country_count";
+  const isPerfect = isCountryCount ? Number(player.total) === 5 : Number(player.total) === 25000;
+  const mapTitle = getChallengeLabel(challenge);
   const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
   const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
 
   let title, color;
-  if (is25k) {
-    title = `🌟 PERFECT SCORE! 25,000 แต้มเต็ม!`;
+  if (isPerfect) {
+    title = isCountryCount
+      ? `🌟 PERFECT! ถูกครบทั้ง 5 ประเทศ!`
+      : `🌟 PERFECT SCORE! 25,000 แต้มเต็ม!`;
     color = 0xF1C40F; // Gold
   } else if (isUpdate) {
     title = `🔄 มีการอัปเดตคะแนน`;
@@ -155,14 +167,36 @@ function createScoreEmbed(challenge, week, player, isUpdate = false, oldScore = 
     color = 0x2ECC71; // Emerald Green
   }
 
-  const scoreText =
-    isUpdate && oldScore !== null
-      ? `**${Number(player.total).toLocaleString()}** / 25,000 (เดิม ${Number(oldScore).toLocaleString()})`
-      : `**${Number(player.total).toLocaleString()}** / 25,000`;
+  let scoreText;
+  let roundsText;
+  if (isCountryCount) {
+    scoreText =
+      isUpdate && oldScore !== null
+        ? `**${Number(player.total)}** / 5 ประเทศ (เดิม ${Number(oldScore)})`
+        : `**${Number(player.total)}** / 5 ประเทศ`;
+    const rArr = [player.r1, player.r2, player.r3, player.r4, player.r5];
+    roundsText = rArr
+      .map((val, idx) => {
+        const icon = Number(val) === 1 ? "✅" : "❌";
+        const detail = Array.isArray(player.roundDetails) ? player.roundDetails[idx] : null;
+        if (detail?.target) {
+          const guessTxt = detail.guess && !detail.ok ? `→${detail.guess}` : "";
+          return `${icon} \`${detail.target}${guessTxt}\``;
+        }
+        return icon;
+      })
+      .join(" • ");
+  } else {
+    scoreText =
+      isUpdate && oldScore !== null
+        ? `**${Number(player.total).toLocaleString()}** / 25,000 (เดิม ${Number(oldScore).toLocaleString()})`
+        : `**${Number(player.total).toLocaleString()}** / 25,000`;
+    roundsText = `\`${Number(player.r1).toLocaleString()}\` • \`${Number(player.r2).toLocaleString()}\` • \`${Number(player.r3).toLocaleString()}\` • \`${Number(player.r4).toLocaleString()}\` • \`${Number(player.r5).toLocaleString()}\``;
+  }
 
   const fields = [
     { name: "👤 ผู้เล่น", value: `**${player.username}**`, inline: true },
-    { name: "⭐ คะแนนรวม", value: scoreText, inline: true },
+    { name: isCountryCount ? "🌍 ทายถูก" : "⭐ คะแนนรวม", value: scoreText, inline: true },
     {
       name: "⏱️ เวลาที่ใช้",
       value: player.totalTime ? `⚡ ${formatDuration(player.totalTime)}` : "-",
@@ -170,7 +204,7 @@ function createScoreEmbed(challenge, week, player, isUpdate = false, oldScore = 
     },
     {
       name: "📊 แต่ละรอบ (R1 - R5)",
-      value: `\`${Number(player.r1).toLocaleString()}\` • \`${Number(player.r2).toLocaleString()}\` • \`${Number(player.r3).toLocaleString()}\` • \`${Number(player.r4).toLocaleString()}\` • \`${Number(player.r5).toLocaleString()}\``,
+      value: roundsText,
       inline: false,
     },
     { name: "🕒 เวลาที่เล่น", value: formatBangkokTime(player.playedAt), inline: true },
@@ -193,15 +227,16 @@ function createScoreEmbed(challenge, week, player, isUpdate = false, oldScore = 
  * สร้าง Embed สรุปกรณีมีผู้เล่นใหม่เข้ามาหลายคนพร้อมกันใน Seed เดียว
  */
 function createBatchNewScoresEmbed(challenge, week, players) {
-  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
-  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const isCountryCount = challenge.game_type === "country_count";
+  const mapTitle = getChallengeLabel(challenge);
   const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
   const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
 
   const playerLines = players
     .map((p) => {
       const timeStr = p.totalTime ? ` • ⏱️ ${formatDuration(p.totalTime)}` : "";
-      return `• **${p.username}**: \`${Number(p.total).toLocaleString()} pts\`${timeStr}`;
+      const scoreUnit = isCountryCount ? `${Number(p.total)}/5 ประเทศ` : `${Number(p.total).toLocaleString()} pts`;
+      return `• **${p.username}**: \`${scoreUnit}\`${timeStr}`;
     })
     .join("\n");
 
@@ -224,8 +259,7 @@ function createBatchNewScoresEmbed(challenge, week, players) {
  * สร้าง Embed สรุปการซิงค์รอบแรกกรณีนำเข้า Seed ที่มีคนเล่นอยู่แล้วจำนวนมาก
  */
 function createInitialImportEmbed(challenge, week, totalPlayers) {
-  const mapName = challenge.name || `Seed ${challenge.seed_number}`;
-  const mapTitle = `Seed ${challenge.seed_number}: ${mapName}`;
+  const mapTitle = getChallengeLabel(challenge);
   const modeText = challenge.game_mode ? ` (${challenge.game_mode})` : "";
   const challengeUrl = `https://www.geoguessr.com/challenge/${challenge.token}`;
 
@@ -254,22 +288,24 @@ async function notifyScoreChanges(challenge, week, newPlayers, updatedPlayers, i
   if (!isDiscordConfigured) return;
   if (newPlayers.length === 0 && updatedPlayers.length === 0) return;
 
+  const isCountryCount = challenge.game_type === "country_count";
   const embeds = [];
 
-  // แยกคะแนน 25,000 เพื่อสร้างการ์ดทองเด่นพิเศษเสมอ
-  const perfect25k = [];
+  // แยกคะแนนเต็ม (25,000 หรือ 5/5) เพื่อสร้างการ์ดทองเด่นพิเศษเสมอ
+  const perfectPlayers = [];
   const normalNew = [];
 
   for (const p of newPlayers) {
-    if (Number(p.total) === 25000) {
-      perfect25k.push(p);
+    const isPerfect = isCountryCount ? Number(p.total) === 5 : Number(p.total) === 25000;
+    if (isPerfect) {
+      perfectPlayers.push(p);
     } else {
       normalNew.push(p);
     }
   }
 
-  // 1. การ์ดทอง 25,000 แต้มเต็ม
-  for (const p of perfect25k) {
+  // 1. การ์ดทอง Perfect Score
+  for (const p of perfectPlayers) {
     embeds.push(createScoreEmbed(challenge, week, p, false, null));
   }
 
@@ -341,8 +377,13 @@ async function sendWeekFreezeSummary(week, challenges) {
       })
       .join("\n");
 
-    const activeChallengesCount = (challenges || []).filter((c) => c.token && c.token.trim() !== "").length;
-    const totalMapsCount = activeChallengesCount > 0 ? activeChallengesCount : challenges.length;
+    const uniqueMapsCount = new Set(
+      (challenges || [])
+        .filter((c) => c.token && c.token.trim() !== "")
+        .map((c) => c.map_number || c.seed_number)
+    ).size;
+    const totalMapsCount = uniqueMapsCount > 0 ? uniqueMapsCount : 7;
+    const activeSeedsCount = (challenges || []).filter((c) => c.token && c.token.trim() !== "").length;
 
     const embed = {
       title: `🏆 ปิดรอบการแข่งขันสัปดาห์: ${week.title}!`,
@@ -350,7 +391,7 @@ async function sendWeekFreezeSummary(week, challenges) {
       color: 0x9B59B6, // Purple
       fields: [
         { name: "👥 ผู้เข้าร่วมทั้งหมด", value: `**${totalParticipants}** คน`, inline: true },
-        { name: "🗺️ จำนวนด่าน", value: `**${totalMapsCount}** Seeds`, inline: true },
+        { name: "🗺️ จำนวนด่าน", value: `**${totalMapsCount}** Maps (${activeSeedsCount} Seeds)`, inline: true },
       ],
       footer: {
         text: `GeoGuessr Weekly Challenge • Auto Freeze Summary`,
@@ -370,9 +411,9 @@ async function sendWeekFreezeSummary(week, challenges) {
 // ====================================================================
 
 /**
- * ดึงผลลัพธ์ Challenge ทั้งหมดจาก GeoGuessr API (พร้อมรองรับ Pagination)
+ * ดึงผลลัพธ์ Challenge ทั้งหมดจาก GeoGuessr API (พร้อมรองรับ Pagination และ Game Type)
  */
-async function fetchChallengeResults(token) {
+async function fetchChallengeResults(token, gameType = "standard") {
   const players = [];
   let pagination = "";
   let page = 0;
@@ -436,12 +477,31 @@ async function fetchChallengeResults(token) {
         // 3. กรองเฉพาะคนที่เล่นครบ 5 รอบเท่านั้น
         if (guesses.length < 5) continue;
 
-        const r1 = Number(guesses[0]?.roundScoreInPoints) || 0;
-        const r2 = Number(guesses[1]?.roundScoreInPoints) || 0;
-        const r3 = Number(guesses[2]?.roundScoreInPoints) || 0;
-        const r4 = Number(guesses[3]?.roundScoreInPoints) || 0;
-        const r5 = Number(guesses[4]?.roundScoreInPoints) || 0;
-        const total = Number(item.totalScore ?? (r1 + r2 + r3 + r4 + r5)) || 0;
+        let r1, r2, r3, r4, r5, total;
+        let roundDetails = null;
+
+        if (gameType === "country_count") {
+          const rounds = Array.isArray(item.game?.rounds) ? item.game.rounds : [];
+          const checks = [];
+          for (let idx = 0; idx < 5; idx++) {
+            const res = await checkRoundCountryMatch(rounds[idx], guesses[idx]);
+            checks.push(res);
+          }
+          r1 = checks[0].ok ? 1 : 0;
+          r2 = checks[1].ok ? 1 : 0;
+          r3 = checks[2].ok ? 1 : 0;
+          r4 = checks[3].ok ? 1 : 0;
+          r5 = checks[4].ok ? 1 : 0;
+          total = r1 + r2 + r3 + r4 + r5;
+          roundDetails = checks;
+        } else {
+          r1 = Number(guesses[0]?.roundScoreInPoints) || 0;
+          r2 = Number(guesses[1]?.roundScoreInPoints) || 0;
+          r3 = Number(guesses[2]?.roundScoreInPoints) || 0;
+          r4 = Number(guesses[3]?.roundScoreInPoints) || 0;
+          r5 = Number(guesses[4]?.roundScoreInPoints) || 0;
+          total = Number(item.totalScore ?? (r1 + r2 + r3 + r4 + r5)) || 0;
+        }
 
         // ดึงเวลาที่เล่นจริง (Timestamp) จากรอบสุดท้าย หรือรอบแรก หรือข้อมูลเกม
         const playedAt =
@@ -493,6 +553,7 @@ async function fetchChallengeResults(token) {
           total,
           playedAt,
           totalTime,
+          roundDetails,
         });
       }
 
@@ -542,16 +603,6 @@ async function main() {
 
   const now = new Date();
 
-  // ตรวจสอบ Auto-Activate สำหรับสัปดาห์ที่กำหนด start_date ไว้ และถึงเวลาเริ่มแล้ว
-  for (const week of nonFrozenWeeks) {
-    if (!week.is_active && week.start_date && now >= new Date(week.start_date)) {
-      console.log(`🚀 ถึงเวลาเริ่มการแข่งขัน! กำลังเปิดใช้งานอัตโนมัติ: ${week.title} (ID: ${week.id})`);
-      await supabase.from("weeks").update({ is_active: false }).neq("id", week.id);
-      await supabase.from("weeks").update({ is_active: true }).eq("id", week.id);
-      week.is_active = true;
-    }
-  }
-
   // ดึงเฉพาะสัปดาห์ที่ Active และถึงเวลาเริ่มแล้วจริง ๆ เพื่อดึงคะแนน
   const activeWeeks = nonFrozenWeeks.filter((w) => {
     if (!w.is_active) return false;
@@ -561,7 +612,6 @@ async function main() {
 
   if (activeWeeks.length === 0) {
     console.log("ℹ️ ไม่มีสัปดาห์ที่เปิดการแข่งขันอยู่ในขณะนี้ (สัปดาห์ที่เหลือเป็น Draft หรือยังไม่ถึงเวลาเริ่ม)");
-    return;
   }
 
   for (const week of activeWeeks) {
@@ -587,22 +637,47 @@ async function main() {
       continue;
     }
 
+    // เรียงลำดับตาม map_number -> sub_seed_number ใน JS (รองรับทั้งก่อนและหลัง Migration)
+    challenges.sort((a, b) => {
+      const mA = a.map_number || a.seed_number || 0;
+      const mB = b.map_number || b.seed_number || 0;
+      if (mA !== mB) return mA - mB;
+      return (a.sub_seed_number || 1) - (b.sub_seed_number || 1);
+    });
+
+    // นับจำนวน sub-seed ต่อ Map เพื่อให้ Discord Label แสดงชัด
+    const mapSeedCounts = new Map();
+    for (const ch of challenges) {
+      const m = ch.map_number || ch.seed_number;
+      mapSeedCounts.set(m, (mapSeedCounts.get(m) || 0) + 1);
+    }
+    for (const ch of challenges) {
+      const m = ch.map_number || ch.seed_number;
+      ch.hasMultiSeed = (mapSeedCounts.get(m) || 1) > 1;
+    }
+
     console.log(`🔍 พบทั้งหมด ${challenges.length} seeds สำหรับ ${week.title}`);
 
-    // เตรียมตัวแปรรวบรวมข้อมูลทั้ง 7 Seeds เพื่อ Batch Upsert ตูมเดียว
-    // ป้องกันไม่ให้หน้าเว็บที่ต่อ Realtime รีเฟรชกระพริบซ้ำๆ 7 รอบ
+    // เตรียมตัวแปรรวบรวมข้อมูลทุก Seeds เพื่อ Batch Upsert ตูมเดียว
+    // ป้องกันไม่ให้หน้าเว็บที่ต่อ Realtime รีเฟรชกระพริบซ้ำๆ
     const allPlayerUpsertsMap = new Map();
     const allScoreUpserts = [];
     const pendingNotifications = [];
 
     for (const challenge of challenges) {
+      const mapNum = challenge.map_number || challenge.seed_number;
+      const subSeedNum = challenge.sub_seed_number || 1;
+      const gameType = challenge.game_type || "standard";
+
       if (!challenge.token || challenge.token.trim() === "") {
-        console.log(`  -> Seed ${challenge.seed_number}: ยังไม่มี Token/ลิงก์ Challenge (ข้าม)`);
+        console.log(`  -> Map ${mapNum} (Seed ${subSeedNum}): ยังไม่มี Token/ลิงก์ Challenge (ข้าม)`);
         continue;
       }
 
-      console.log(`  -> กำลังดึง Seed ${challenge.seed_number} (Token: ${challenge.token})...`);
-      const results = await fetchChallengeResults(challenge.token);
+      console.log(
+        `  -> กำลังดึง Map ${mapNum} (Seed ${subSeedNum}, Type: ${gameType}, Token: ${challenge.token})...`
+      );
+      const results = await fetchChallengeResults(challenge.token, gameType);
       console.log(`     ได้ข้อมูลผู้เล่นครบ 5 รอบ: ${results.length} คน`);
 
       if (results.length === 0) continue;
@@ -620,15 +695,22 @@ async function main() {
             let adjustedCount = 0;
             results.forEach((r) => {
               let changed = false;
-              if (adj.rule_type === "threshold_to_max" && r[rKey] >= adj.min_score) {
-                r[rKey] = adj.target_score;
-                changed = true;
-              } else if (adj.rule_type === "void_round") {
-                r[rKey] = adj.target_score || 5000;
-                changed = true;
-              } else if (adj.rule_type === "bonus_points" && adj.bonus_points > 0) {
-                r[rKey] = Math.min(5000, r[rKey] + adj.bonus_points);
-                changed = true;
+              if (gameType === "country_count") {
+                if (adj.rule_type === "void_round") {
+                  r[rKey] = 1;
+                  changed = true;
+                }
+              } else {
+                if (adj.rule_type === "threshold_to_max" && r[rKey] >= adj.min_score) {
+                  r[rKey] = adj.target_score;
+                  changed = true;
+                } else if (adj.rule_type === "void_round") {
+                  r[rKey] = adj.target_score || 5000;
+                  changed = true;
+                } else if (adj.rule_type === "bonus_points" && adj.bonus_points > 0) {
+                  r[rKey] = Math.min(5000, r[rKey] + adj.bonus_points);
+                  changed = true;
+                }
               }
 
               if (changed) {
@@ -711,6 +793,7 @@ async function main() {
         };
         if (r.playedAt) itemObj.played_at = r.playedAt;
         if (r.totalTime) itemObj.total_time = r.totalTime;
+        if (r.roundDetails) itemObj.round_details = r.roundDetails;
         allScoreUpserts.push(itemObj);
       }
 
@@ -739,24 +822,31 @@ async function main() {
     }
 
     if (allScoreUpserts.length > 0) {
-      console.log(`  💾 กำลังบันทึกคะแนนรวม ${allScoreUpserts.length} รายการ (Batch Upsert 7 Seeds)...`);
+      console.log(`  💾 กำลังบันทึกคะแนนรวม ${allScoreUpserts.length} รายการ (Batch Upsert)...`);
       let { error: sErr } = await supabase
         .from("scores")
         .upsert(allScoreUpserts, { onConflict: "challenge_id,player_id" });
 
-      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ played_at หรือ total_time ให้บันทึกแบบเดิม
+      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ round_details / played_at / total_time
       if (
         sErr &&
-        (sErr.message?.includes("played_at") ||
+        (sErr.message?.includes("round_details") ||
+          sErr.message?.includes("played_at") ||
           sErr.message?.includes("total_time") ||
           sErr.code === "PGRST204")
       ) {
-        console.warn("  ℹ️ ตาราง scores ยังไม่มีคอลัมน์ played_at / total_time (ลองบันทึกเฉพาะคะแนนแบบเดิม)...");
-        const fallbackUpserts = allScoreUpserts.map(({ played_at, total_time, ...rest }) => rest);
-        const { error: fbErr } = await supabase
+        console.warn("  ℹ️ กำลัง fallback บันทึก scores (บางคอลัมน์เสริมยังไม่มีในตาราง)...");
+        const withoutRoundDetails = allScoreUpserts.map(({ round_details, ...rest }) => rest);
+        const { error: fb1Err } = await supabase
           .from("scores")
-          .upsert(fallbackUpserts, { onConflict: "challenge_id,player_id" });
-        if (fbErr) console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fbErr.message);
+          .upsert(withoutRoundDetails, { onConflict: "challenge_id,player_id" });
+        if (fb1Err) {
+          const fallbackBasic = allScoreUpserts.map(({ round_details, played_at, total_time, ...rest }) => rest);
+          const { error: fb2Err } = await supabase
+            .from("scores")
+            .upsert(fallbackBasic, { onConflict: "challenge_id,player_id" });
+          if (fb2Err) console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fb2Err.message);
+        }
       } else if (sErr) {
         console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
       }
@@ -781,9 +871,21 @@ async function main() {
 
     // หากถึงเวลาตัดรอบ ให้ Freeze สัปดาห์นี้ทันทีหลังจาก Sync รอบสุดท้ายเสร็จ
     if (shouldFreeze) {
-      await supabase.from("weeks").update({ is_frozen: true }).eq("id", week.id);
+      await supabase.from("weeks").update({ is_frozen: true, is_active: false }).eq("id", week.id);
+      week.is_frozen = true;
+      week.is_active = false;
       console.log(`❄️ ถึงเวลาตัดรอบแล้ว: ทำการ Freeze สัปดาห์ "${week.title}" สำเร็จ!`);
       await sendWeekFreezeSummary(week, challenges);
+    }
+  }
+
+  // 2. ตรวจสอบ Auto-Activate สำหรับสัปดาห์ถัดไปที่กำหนด start_date ไว้ และถึงเวลาเริ่มแล้ว
+  for (const week of nonFrozenWeeks) {
+    if (!week.is_frozen && !week.is_active && week.start_date && now >= new Date(week.start_date)) {
+      console.log(`🚀 ถึงเวลาเริ่มการแข่งขัน! ทำการ Auto-Activate สัปดาห์ใหม่: ${week.title} (ID: ${week.id})`);
+      await supabase.from("weeks").update({ is_active: false }).neq("id", week.id);
+      await supabase.from("weeks").update({ is_active: true }).eq("id", week.id);
+      week.is_active = true;
     }
   }
 

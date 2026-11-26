@@ -8,8 +8,14 @@
     "test-discord": "node test-discord.js"
   },
   "dependencies": {
+    "@rapideditor/country-coder": "^6.0.0",
     "@supabase/supabase-js": "^2.49.1",
+    "@turf/bbox": "^7.4.0",
+    "@turf/boolean-point-in-polygon": "^7.4.0",
     "dotenv": "^16.4.7",
+    "rbush": "^4.0.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
     "ws": "^8.22.2"
   }
 }

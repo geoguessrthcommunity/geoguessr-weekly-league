@@ -233,6 +233,37 @@ body {
   color: var(--navy-dark);
 }
 
+.map-links-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.map-btn.multi {
+  font-size: 0.7rem;
+  padding: 3px 6px;
+}
+
+.map-meta-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.map-meta-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.35);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 /* 3. แถบสลับมุมมอง (Sub-tabs สลับตารางคะแนนรวม กับ คะแนนดิบ) */
 .view-switch-bar {
   background: #0f1d36;
