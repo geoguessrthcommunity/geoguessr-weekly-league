@@ -519,8 +519,8 @@ function renderMapLinksHtml(seeds, isHeaderCard = false) {
           const sNum = getSubSeedNum(c);
           const hasUrl = c.url && c.url.trim() !== "" && c.token && c.token.trim() !== "";
           return hasUrl
-            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn multi" title="Play Seed ${sNum}">▶ S${sNum}</a>`
-            : `<span class="map-btn multi" style="opacity: 0.55; cursor: not-allowed; background: #64748b;" title="Seed ${sNum} Soon">🔒 S${sNum}</span>`;
+            ? `<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="map-btn multi" title="Play Seed ${sNum}">▶ Seed ${sNum}</a>`
+            : `<span class="map-btn multi" style="opacity: 0.55; cursor: not-allowed; background: #64748b;" title="Seed ${sNum} Soon">🔒 Seed ${sNum}</span>`;
         })
         .join("")}
     </div>
