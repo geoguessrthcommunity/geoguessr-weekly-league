@@ -118,8 +118,11 @@ async function lookupCountryCode(lat, lng) {
   // 1. ตรวจสอบด้วย Natural Earth 10m ก่อน (แม่นยำตามแนวชายฝั่งและพรมแดน ไม่หลุดลงทะเล)
   let code = exactLookup10m(lng, lat);
 
-  // 2. ตรวจสอบ Microstate (เช่น Vatican) ที่อาจถูกซ้อนทับในประเทศล้อมรอบ
-  if (countryCoder && (!code || code === "IT" || code === "FR" || code === "ES" || code === "CH" || code === "AT")) {
+  // 2. ตรวจสอบ Microstate (เช่น Vatican, Monaco, Singapore) ที่อาจถูกซ้อนทับในประเทศล้อมรอบ
+  if (
+    countryCoder &&
+    (!code || code === "IT" || code === "FR" || code === "ES" || code === "CH" || code === "AT" || code === "MY")
+  ) {
     const micro = countryCoder.iso1A2Code([lng, lat], { level: "territory" });
     if (micro && MICROSTATE_CODES.has(micro.toUpperCase())) {
       return micro.toUpperCase();

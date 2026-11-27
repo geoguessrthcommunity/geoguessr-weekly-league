@@ -350,8 +350,55 @@ async function notifyScoreChanges(challenge, week, newPlayers, updatedPlayers, i
   }
 }
 
+function scoreSingleSeedSync(pList, gameType = "standard") {
+  if (!pList || pList.length === 0) return [];
+  const isCountryCount = gameType === "country_count";
+
+  for (let m = 0; m < 6; m++) {
+    const maxScore = isCountryCount ? (m < 5 ? 1 : 5) : (m < 5 ? 5000 : 25000);
+
+    pList.forEach((p) => {
+      p.points = p.points || [];
+      p.phantoms = p.phantoms || [];
+      const raw = p.raw[m];
+      p.phantoms[m] = isCountryCount ? raw : raw + 0.1 * Math.max(0, maxScore - raw);
+    });
+
+    pList.forEach((p, i) => {
+      let ptsInRound = 0;
+      const pRaw = p.raw[m];
+      const pPhan = p.phantoms[m];
+
+      if (isCountryCount && pRaw === 0) {
+        p.points[m] = 0;
+      } else {
+        pList.forEach((opp, j) => {
+          if (i === j) return;
+          const oppRaw = opp.raw[m];
+          const oppPhan = opp.phantoms[m];
+          if (isCountryCount) {
+            if (pRaw > oppRaw) ptsInRound += 1;
+            else if (pRaw === oppRaw) ptsInRound += 0.5;
+          } else {
+            if (pRaw > oppPhan && oppRaw <= pPhan) ptsInRound += 1;
+            else if (pRaw <= oppPhan && oppRaw <= pPhan) ptsInRound += 0.5;
+          }
+        });
+        p.points[m] = ptsInRound;
+      }
+    });
+  }
+
+  pList.forEach((p) => {
+    p.ptsRounds = p.points.reduce((a, b) => a + b, 0);
+    p.ptsMap = Math.round(p.ptsRounds);
+  });
+
+  return pList;
+}
+
 /**
- * ส่งสรุปผลการ Freeze สัปดาห์ไปยัง Discord (Podium 1st, 2nd, 3rd)
+ * ส่งสรุปผลการ Freeze สัปดาห์ไปยัง Discord (Podium 1st, 2nd, 3rd ตาม League Points จริง)
  */
 async function sendWeekFreezeSummary(week, challenges) {
   const isDiscordConfigured =
@@ -367,35 +414,69 @@ async function sendWeekFreezeSummary(week, challenges) {
         : await fetchAllRows(() =>
             supabase
               .from("scores")
-              .select("id, player_id, total_score, players(id, username)")
+              .select("id, challenge_id, player_id, r1, r2, r3, r4, r5, total_score, players(id, username)")
               .in("challenge_id", challengeIds)
               .order("id", { ascending: true })
           );
 
     if (error || !scores || scores.length === 0) return;
 
-    const playerTotals = {};
+    const scoresByCh = new Map();
     for (const s of scores) {
-      const pid = s.player_id;
-      const uname = s.players?.username || "Anonymous";
-      if (!playerTotals[pid]) {
-        playerTotals[pid] = { username: uname, totalRaw: 0, mapsPlayed: 0 };
-      }
-      playerTotals[pid].totalRaw += Number(s.total_score) || 0;
-      playerTotals[pid].mapsPlayed += 1;
+      if (!scoresByCh.has(s.challenge_id)) scoresByCh.set(s.challenge_id, []);
+      scoresByCh.get(s.challenge_id).push(s);
     }
 
-    const sortedPlayers = Object.values(playerTotals).sort((a, b) => b.totalRaw - a.totalRaw);
-    const totalParticipants = sortedPlayers.length;
+    // จัดกลุ่ม Map (1..7) เพื่อคำนวณ Multi-Seed เฉลี่ยให้ตรงกับหน้าเว็บ
+    const mapGroups = new Map();
+    for (const ch of challenges) {
+      const m = ch.map_number || ch.seed_number;
+      if (!mapGroups.has(m)) mapGroups.set(m, { mapNumber: m, gameType: ch.game_type || "standard", seeds: [] });
+      mapGroups.get(m).seeds.push(ch);
+    }
 
-    const medals = ["🥇", "🥈", "🥉"];
-    const topLines = sortedPlayers
-      .slice(0, 5)
-      .map((p, idx) => {
-        const medal = medals[idx] || `**#${idx + 1}**`;
-        return `${medal} **${p.username}** — \`${Number(p.totalRaw).toLocaleString()}\` แต้ม (${p.mapsPlayed}/${challenges.length} maps)`;
-      })
-      .join("\n");
+    const playerTotals = new Map();
+    for (const [, grp] of mapGroups) {
+      const seedCount = grp.seeds.length;
+      const mapAgg = new Map();
+
+      for (const ch of grp.seeds) {
+        const rawList = scoresByCh.get(ch.id) || [];
+        const pList = rawList.map((s) => ({
+          userId: s.player_id,
+          username: s.players?.username || "Anonymous",
+          raw: [
+            Number(s.r1) || 0,
+            Number(s.r2) || 0,
+            Number(s.r3) || 0,
+            Number(s.r4) || 0,
+            Number(s.r5) || 0,
+            Number(s.total_score ?? ((s.r1 || 0) + (s.r2 || 0) + (s.r3 || 0) + (s.r4 || 0) + (s.r5 || 0))) || 0,
+          ],
+        }));
+
+        scoreSingleSeedSync(pList, ch.game_type || "standard");
+        for (const p of pList) {
+          if (!mapAgg.has(p.userId)) {
+            mapAgg.set(p.userId, { username: p.username, sumPts: 0 });
+          }
+          mapAgg.get(p.userId).sumPts += p.ptsMap;
+        }
+      }
+
+      for (const [uid, agg] of mapAgg) {
+        const ptsMap = seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10;
+        if (!playerTotals.has(uid)) {
+          playerTotals.set(uid, { username: agg.username, grandTotal: 0, mapsPlayed: 0 });
+        }
+        const pt = playerTotals.get(uid);
+        pt.grandTotal = Math.round((pt.grandTotal + ptsMap) * 10) / 10;
+        pt.mapsPlayed += 1;
+      }
+    }
+
+    const sortedPlayers = Array.from(playerTotals.values()).sort((a, b) => b.grandTotal - a.grandTotal);
+    const totalParticipants = sortedPlayers.length;
 
     const uniqueMapsCount = new Set(
       (challenges || [])
@@ -405,9 +486,19 @@ async function sendWeekFreezeSummary(week, challenges) {
     const totalMapsCount = uniqueMapsCount > 0 ? uniqueMapsCount : 7;
     const activeSeedsCount = (challenges || []).filter((c) => c.token && c.token.trim() !== "").length;
 
+    const medals = ["🥇", "🥈", "🥉"];
+    const topLines = sortedPlayers
+      .slice(0, 5)
+      .map((p, idx) => {
+        const medal = medals[idx] || `**#${idx + 1}**`;
+        const ptsFmt = Number(p.grandTotal).toLocaleString(undefined, { maximumFractionDigits: 1 });
+        return `${medal} **${p.username}** — \`${ptsFmt}\` pts (${p.mapsPlayed}/${totalMapsCount} maps)`;
+      })
+      .join("\n");
+
     const embed = {
       title: `🏆 ปิดรอบการแข่งขันสัปดาห์: ${week.title}!`,
-      description: `❄️ สัปดาห์นี้ถึงกำหนดส่งผลและถูก **Freeze** สรุปคะแนนเรียบร้อยแล้ว!\n\n**Top Leaderboard (คะแนนดิบรวม):**\n${topLines}`,
+      description: `❄️ สัปดาห์นี้ถึงกำหนดส่งผลและถูก **Freeze** สรุปคะแนนเรียบร้อยแล้ว!\n\n**Top Leaderboard (League Points):**\n${topLines}`,
       color: 0x9B59B6, // Purple
       fields: [
         { name: "👥 ผู้เข้าร่วมทั้งหมด", value: `**${totalParticipants}** คน`, inline: true },
@@ -678,6 +769,18 @@ async function main() {
 
     console.log(`🔍 พบทั้งหมด ${challenges.length} seeds สำหรับ ${week.title}`);
 
+    // ดึงรายชื่อผู้เล่นที่ถูก DQ ในสัปดาห์นี้ (ถ้ามีตาราง disqualified_players)
+    const dqSet = new Set();
+    try {
+      const { data: dqRows, error: dqErr } = await supabase
+        .from("disqualified_players")
+        .select("player_id")
+        .eq("week_id", week.id);
+      if (!dqErr && Array.isArray(dqRows)) {
+        dqRows.forEach((row) => dqSet.add(row.player_id));
+      }
+    } catch (dqCheckErr) {}
+
     // เตรียมตัวแปรรวบรวมข้อมูลทุก Seeds เพื่อ Batch Upsert ตูมเดียว
     // ป้องกันไม่ให้หน้าเว็บที่ต่อ Realtime รีเฟรชกระพริบซ้ำๆ
     const allPlayerUpsertsMap = new Map();
@@ -697,7 +800,8 @@ async function main() {
       console.log(
         `  -> กำลังดึง Map ${mapNum} (Seed ${subSeedNum}, Type: ${gameType}, Token: ${challenge.token})...`
       );
-      const results = await fetchChallengeResults(challenge.token, gameType);
+      const rawResults = await fetchChallengeResults(challenge.token, gameType);
+      const results = dqSet.size > 0 ? rawResults.filter((r) => !dqSet.has(r.userId)) : rawResults;
       console.log(`     ได้ข้อมูลผู้เล่นครบ 5 รอบ: ${results.length} คน`);
 
       if (results.length === 0) continue;
@@ -755,12 +859,17 @@ async function main() {
         let { data: exScores, error: exErr } = await fetchAllRows(() =>
           supabase
             .from("scores")
-            .select("id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time")
+            .select("id, player_id, total_score, r1, r2, r3, r4, r5, played_at, total_time, is_manual")
             .eq("challenge_id", challenge.id)
             .order("id", { ascending: true })
         );
 
-        if (exErr && (exErr.message?.includes("played_at") || exErr.code === "PGRST204")) {
+        if (
+          exErr &&
+          (exErr.message?.includes("played_at") ||
+            exErr.message?.includes("is_manual") ||
+            exErr.code === "PGRST204")
+        ) {
           const fallback = await fetchAllRows(() =>
             supabase
               .from("scores")
@@ -780,23 +889,36 @@ async function main() {
         existingMap.set(s.player_id, s);
       }
 
-      // ตรวจหาคะแนนใหม่และคะแนนที่เปลี่ยนแปลง
+      // ตรวจหาคะแนนใหม่และคะแนนที่เปลี่ยนแปลง (ข้ามแถวที่แอดมินแก้ด้วยมือ is_manual = true)
       const newPlayers = [];
       const updatedPlayers = [];
+      const activeResults = [];
 
       for (const r of results) {
         const existing = existingMap.get(r.userId);
+        if (existing?.is_manual) {
+          continue;
+        }
+        activeResults.push(r);
+
         if (!existing) {
           newPlayers.push(r);
-        } else if (Number(existing.total_score) !== Number(r.total)) {
+        } else if (
+          Number(existing.total_score) !== Number(r.total) ||
+          Number(existing.r1) !== Number(r.r1) ||
+          Number(existing.r2) !== Number(r.r2) ||
+          Number(existing.r3) !== Number(r.r3) ||
+          Number(existing.r4) !== Number(r.r4) ||
+          Number(existing.r5) !== Number(r.r5)
+        ) {
           updatedPlayers.push({ ...r, oldScore: existing.total_score });
         }
       }
 
-      const isInitialImport = existingMap.size === 0 && results.length > 5;
+      const isInitialImport = existingMap.size === 0 && activeResults.length > 5;
 
       // รวบรวมข้อมูลผู้เล่น (Deduplicate ตาม userId)
-      for (const r of results) {
+      for (const r of activeResults) {
         allPlayerUpsertsMap.set(r.userId, {
           id: r.userId,
           username: r.username,
@@ -804,8 +926,23 @@ async function main() {
         });
       }
 
-      // รวบรวมคะแนนของ Seed นี้ไว้ใน Array รวม
-      for (const r of results) {
+      // รวบรวมเฉพาะคะแนนที่เพิ่มใหม่หรือมีการเปลี่ยนแปลง/เติมข้อมูลเวลาที่ขาด
+      for (const r of activeResults) {
+        const existing = existingMap.get(r.userId);
+        const scoreChanged =
+          !existing ||
+          Number(existing.total_score) !== Number(r.total) ||
+          Number(existing.r1) !== Number(r.r1) ||
+          Number(existing.r2) !== Number(r.r2) ||
+          Number(existing.r3) !== Number(r.r3) ||
+          Number(existing.r4) !== Number(r.r4) ||
+          Number(existing.r5) !== Number(r.r5);
+        const missingMeta =
+          Boolean(existing) &&
+          ((r.playedAt && !existing.played_at) || (r.totalTime && !existing.total_time));
+
+        if (!scoreChanged && !missingMeta) continue;
+
         const itemObj = {
           challenge_id: challenge.id,
           player_id: r.userId,
@@ -836,46 +973,54 @@ async function main() {
     }
 
     // ================================================================
-    // บันทึกข้อมูลลงฐานข้อมูลแบบ Batch ครั้งเดียวจบ (One-shot Update)
+    // บันทึกข้อมูลลงฐานข้อมูลแบบ Batch (แบ่ง chunk ละ 500 ป้องกัน payload เกิน)
     // ================================================================
     if (allPlayerUpsertsMap.size > 0) {
       console.log(`\n  💾 กำลังบันทึกข้อมูลผู้เล่นรวม ${allPlayerUpsertsMap.size} คน...`);
       const playerUpserts = Array.from(allPlayerUpsertsMap.values());
-      const { error: pErr } = await supabase
-        .from("players")
-        .upsert(playerUpserts, { onConflict: "id" });
-      if (pErr) console.warn("  ⚠️ เตือน: อัปเดตตาราง players ไม่สำเร็จ:", pErr.message);
+      for (let i = 0; i < playerUpserts.length; i += 500) {
+        const chunk = playerUpserts.slice(i, i + 500);
+        const { error: pErr } = await supabase
+          .from("players")
+          .upsert(chunk, { onConflict: "id" });
+        if (pErr) console.warn("  ⚠️ เตือน: อัปเดตตาราง players ไม่สำเร็จ:", pErr.message);
+      }
     }
 
     if (allScoreUpserts.length > 0) {
-      console.log(`  💾 กำลังบันทึกคะแนนรวม ${allScoreUpserts.length} รายการ (Batch Upsert)...`);
-      let { error: sErr } = await supabase
-        .from("scores")
-        .upsert(allScoreUpserts, { onConflict: "challenge_id,player_id" });
-
-      // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ round_details / played_at / total_time
-      if (
-        sErr &&
-        (sErr.message?.includes("round_details") ||
-          sErr.message?.includes("played_at") ||
-          sErr.message?.includes("total_time") ||
-          sErr.code === "PGRST204")
-      ) {
-        console.warn("  ℹ️ กำลัง fallback บันทึก scores (บางคอลัมน์เสริมยังไม่มีในตาราง)...");
-        const withoutRoundDetails = allScoreUpserts.map(({ round_details, ...rest }) => rest);
-        const { error: fb1Err } = await supabase
+      console.log(`  💾 กำลังบันทึกคะแนนใหม่/อัปเดต ${allScoreUpserts.length} รายการ (Batch Upsert)...`);
+      for (let i = 0; i < allScoreUpserts.length; i += 500) {
+        const chunk = allScoreUpserts.slice(i, i + 500);
+        let { error: sErr } = await supabase
           .from("scores")
-          .upsert(withoutRoundDetails, { onConflict: "challenge_id,player_id" });
-        if (fb1Err) {
-          const fallbackBasic = allScoreUpserts.map(({ round_details, played_at, total_time, ...rest }) => rest);
-          const { error: fb2Err } = await supabase
+          .upsert(chunk, { onConflict: "challenge_id,player_id" });
+
+        // กรณีที่ Supabase ยังไม่ได้รัน ALTER TABLE เพิ่มคอลัมน์ round_details / played_at / total_time
+        if (
+          sErr &&
+          (sErr.message?.includes("round_details") ||
+            sErr.message?.includes("played_at") ||
+            sErr.message?.includes("total_time") ||
+            sErr.code === "PGRST204")
+        ) {
+          console.warn("  ℹ️ กำลัง fallback บันทึก scores (บางคอลัมน์เสริมยังไม่มีในตาราง)...");
+          const withoutRoundDetails = chunk.map(({ round_details, ...rest }) => rest);
+          const { error: fb1Err } = await supabase
             .from("scores")
-            .upsert(fallbackBasic, { onConflict: "challenge_id,player_id" });
-          if (fb2Err) console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fb2Err.message);
+            .upsert(withoutRoundDetails, { onConflict: "challenge_id,player_id" });
+          if (fb1Err) {
+            const fallbackBasic = chunk.map(({ round_details, played_at, total_time, ...rest }) => rest);
+            const { error: fb2Err } = await supabase
+              .from("scores")
+              .upsert(fallbackBasic, { onConflict: "challenge_id,player_id" });
+            if (fb2Err) console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", fb2Err.message);
+          }
+        } else if (sErr) {
+          console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
         }
-      } else if (sErr) {
-        console.warn("  ⚠️ เตือน: อัปเดตตาราง scores ไม่สำเร็จ:", sErr.message);
       }
+    } else {
+      console.log("  ✅ ไม่มีคะแนนใหม่หรือคะแนนที่เปลี่ยนแปลง");
     }
 
     // ส่งแจ้งเตือน Discord สำหรับทุก Challenge ที่มีคะแนนใหม่

@@ -23,6 +23,7 @@ const editWeekEndDate = document.getElementById("editWeekEndDate");
 const editMapsContainer = document.getElementById("editMapsContainer");
 
 let adminDb = null;
+const weeksById = new Map();
 
 // ตรวจสอบสถานะล็อกอินทันทีที่เปิดหน้า
 async function checkAuth() {
@@ -296,9 +297,13 @@ async function loadWeeks() {
     .order("id", { ascending: false });
 
   if (error || !weeks || weeks.length === 0) {
+    weeksById.clear();
     weeksList.innerHTML = `<p style="color: #64748b; padding: 12px;">ยังไม่มีสัปดาห์ใด ๆ ในระบบ</p>`;
     return;
   }
+
+  weeksById.clear();
+  weeks.forEach((w) => weeksById.set(w.id, w));
 
   weeksList.innerHTML = weeks
     .map((w) => {
@@ -372,11 +377,11 @@ async function loadWeeks() {
             
             <div class="week-actions">
               ${actionButtons}
-              <button class="btn" style="background: #0284c7; color: white;" onclick="openScoresModal(${w.id}, '${escapeHtml(w.title)}')">📊 จัดการคะแนน</button>
-              <button class="btn" style="background: #0d9488; color: white;" onclick="openMapInspectorModal(${w.id}, '${escapeHtml(w.title)}')">🧮 ตรวจการคิดคะแนน</button>
-              <button class="btn" style="background: #7c3aed; color: white;" onclick="openAdjustmentsModal(${w.id}, '${escapeHtml(w.title)}')">🛠️ กฎคะแนนพิเศษ</button>
+              <button class="btn" style="background: #0284c7; color: white;" onclick="openScoresModal(${w.id})">📊 จัดการคะแนน</button>
+              <button class="btn" style="background: #0d9488; color: white;" onclick="openMapInspectorModal(${w.id})">🧮 ตรวจการคิดคะแนน</button>
+              <button class="btn" style="background: #7c3aed; color: white;" onclick="openAdjustmentsModal(${w.id})">🛠️ กฎคะแนนพิเศษ</button>
               <button class="btn btn-edit" onclick="openEditModal(${w.id})">✏️ แก้ไขข้อมูล & 7 Maps</button>
-              <button class="btn btn-danger" onclick="deleteWeek(${w.id}, '${escapeHtml(w.title)}')">🗑️ ลบ</button>
+              <button class="btn btn-danger" onclick="deleteWeek(${w.id})">🗑️ ลบ</button>
             </div>
           </div>
 
@@ -720,16 +725,28 @@ window.setActiveWeek = async function (id) {
 
 window.setDraftWeek = async function (id) {
   if (!adminDb) return;
-  if (!confirm("ต้องการเปลี่ยนสถานะสัปดาห์นี้ให้เป็น 'แบบร่าง (Draft)' หรือไม่?\n\n(คนดูในหน้าแรกจะไม่เห็นสัปดาห์นี้ จนกว่าคุณจะกดเปิดแข่งขันอีกครั้ง)")) {
+  if (
+    !confirm(
+      "ต้องการเปลี่ยนสถานะสัปดาห์นี้ให้เป็น 'แบบร่าง (Draft)' หรือไม่?\n\n(คนดูในหน้าแรกจะไม่เห็นสัปดาห์นี้ และระบบจะล้างวันเริ่มแข่งอัตโนมัติจนกว่าคุณจะกำหนดใหม่หรือกดเปิดแข่งขันอีกครั้ง)"
+    )
+  ) {
     return;
   }
-  await adminDb.from("weeks").update({ is_active: false }).eq("id", id);
+  const { error } = await adminDb
+    .from("weeks")
+    .update({ is_active: false, start_date: null })
+    .eq("id", id);
+  if (error) {
+    alert("เกิดข้อผิดพลาด: " + error.message);
+    return;
+  }
   loadWeeks();
 };
 
 window.deleteWeek = async function (id, title) {
   if (!adminDb) return;
-  if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสัปดาห์ "${title}"? ข้อมูลคะแนนทั้งหมดจะหายไป`)) return;
+  const resolvedTitle = title || weeksById.get(id)?.title || `Week ${id}`;
+  if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสัปดาห์ "${resolvedTitle}"? ข้อมูลคะแนนทั้งหมดจะหายไป`)) return;
   await adminDb.from("weeks").delete().eq("id", id);
   loadWeeks();
 };
@@ -766,8 +783,8 @@ function renderFlags(text) {
 
 function escapeHtml(text) {
   const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+  div.textContent = text ?? "";
+  return div.innerHTML.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
 }
 
 // ==========================================
@@ -788,9 +805,10 @@ function formatDuration(sec) {
 
 window.openScoresModal = async function (weekId, weekTitle) {
   currentScoresWeekId = weekId;
+  const resolvedTitle = weekTitle || weeksById.get(weekId)?.title || `Week ${weekId}`;
   const modal = document.getElementById("scoresModal");
   document.getElementById("scoresModalTitle").textContent = `📊 จัดการคะแนนผู้เล่น`;
-  document.getElementById("scoresModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
+  document.getElementById("scoresModalSubtitle").textContent = `สัปดาห์: ${resolvedTitle}`;
   document.getElementById("scoresSearchInput").value = "";
   document.getElementById("scoresFilterMap").value = "all";
   if (document.getElementById("scoresSortBy")) {
@@ -1090,9 +1108,27 @@ window.disqualifyPlayerByScore = async function (scoreId) {
       .in("challenge_id", chIds);
 
     if (error) throw error;
+
+    // บันทึกรายชื่อผู้เล่นที่ถูก DQ ไว้ไม่ให้ sync.js ดึงคะแนนกลับมาซ้ำในสัปดาห์นี้
+    let dqSaved = false;
+    try {
+      const { error: dqErr } = await adminDb.from("disqualified_players").upsert(
+        {
+          week_id: currentScoresWeekId,
+          player_id: playerId,
+          reason: "DQ by admin",
+        },
+        { onConflict: "week_id,player_id" }
+      );
+      if (!dqErr) dqSaved = true;
+    } catch (e) {}
+
     currentWeekScores = currentWeekScores.filter((x) => x.player_id !== playerId);
     renderScoresList();
-    alert(`✅ ตัดสิทธิ์และล้างคะแนนของ "${pseudo}" ในสัปดาห์นี้เรียบร้อยแล้ว`);
+    alert(
+      `✅ ตัดสิทธิ์และล้างคะแนนของ "${pseudo}" ในสัปดาห์นี้เรียบร้อยแล้ว` +
+        (dqSaved ? "" : "\n(หมายเหตุ: หากยังไม่ได้รัน SQL ตาราง disqualified_players ระบบ Sync รอบถัดไปอาจดึงคะแนนผู้เล่นนี้กลับมา)")
+    );
   } catch (err) {
     console.error("DQ player error:", err);
     alert("เกิดข้อผิดพลาดในการตัดสิทธิ์ผู้เล่น: " + err.message);
@@ -1219,21 +1255,30 @@ if (manualScoreForm) {
         if (pErr) throw pErr;
       }
 
-      // 2. บันทึกคะแนนลงตาราง scores (upsert)
-      const { error: sErr } = await adminDb.from("scores").upsert(
-        {
-          challenge_id: challengeId,
-          player_id: playerId,
-          r1,
-          r2,
-          r3,
-          r4,
-          r5,
-          total_score: total,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "challenge_id,player_id" }
-      );
+      // 2. บันทึกคะแนนลงตาราง scores (upsert พร้อมทำเครื่องหมาย is_manual เพื่อป้องกัน Sync เขียนทับ)
+      const scorePayload = {
+        challenge_id: challengeId,
+        player_id: playerId,
+        r1,
+        r2,
+        r3,
+        r4,
+        r5,
+        total_score: total,
+        is_manual: true,
+        updated_at: new Date().toISOString(),
+      };
+      let { error: sErr } = await adminDb
+        .from("scores")
+        .upsert(scorePayload, { onConflict: "challenge_id,player_id" });
+
+      if (sErr && (sErr.message?.includes("is_manual") || sErr.code === "PGRST204")) {
+        const { is_manual, ...fallbackPayload } = scorePayload;
+        const fb = await adminDb
+          .from("scores")
+          .upsert(fallbackPayload, { onConflict: "challenge_id,player_id" });
+        sErr = fb.error;
+      }
 
       if (sErr) throw sErr;
 
@@ -1398,9 +1443,10 @@ let currentAdjChallenges = [];
 window.openAdjustmentsModal = async function (weekId, weekTitle) {
   if (!adminDb) return;
   currentAdjWeekId = weekId;
+  const resolvedTitle = weekTitle || weeksById.get(weekId)?.title || `Week ${weekId}`;
   const modal = document.getElementById("adjustmentsModal");
   document.getElementById("adjModalTitle").textContent = "🛠️ กฎปรับคะแนนพิเศษ (Score Adjustments)";
-  document.getElementById("adjModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
+  document.getElementById("adjModalSubtitle").textContent = `สัปดาห์: ${resolvedTitle}`;
   modal.classList.add("open");
 
   const { data: challenges } = await adminDb
@@ -1422,9 +1468,11 @@ window.openAdjustmentsModal = async function (weekId, weekTitle) {
       const m = getMapNum(c);
       const sub = getSubSeedNum(c);
       const seedTag = (mapSeedCounts.get(m) || 1) > 1 ? ` (Seed ${sub})` : "";
-      return `<option value="${c.id}">Map ${m}${seedTag}: ${escapeHtml(c.name || `Map ${m}`)}</option>`;
+      const typeTag = getGameType(c) === "country_count" ? " [🌍 Country Count]" : "";
+      return `<option value="${c.id}">Map ${m}${seedTag}: ${escapeHtml(c.name || `Map ${m}`)}${typeTag}</option>`;
     })
     .join("");
+  mapSelect.onchange = updateRuleInputsVisibility;
 
   updateRuleInputsVisibility();
   await loadActiveAdjustments(weekId);
@@ -1435,10 +1483,36 @@ window.closeAdjustmentsModal = function () {
 };
 
 window.updateRuleInputsVisibility = function () {
-  const ruleType = document.getElementById("adjRuleType").value;
+  const ruleSelect = document.getElementById("adjRuleType");
+  const selectedChId = Number(document.getElementById("adjMapSelect")?.value);
+  const selectedCh = currentAdjChallenges.find((c) => c.id === selectedChId);
+  const isCountry = getGameType(selectedCh) === "country_count";
+
+  if (isCountry && ruleSelect.value !== "void_round") {
+    ruleSelect.value = "void_round";
+  }
+
+  const ruleType = ruleSelect.value;
   const minCont = document.getElementById("adjMinScoreContainer");
   const targetCont = document.getElementById("adjTargetScoreContainer");
   const bonusCont = document.getElementById("adjBonusContainer");
+  const targetInp = document.getElementById("adjTargetScore");
+
+  if (isCountry) {
+    minCont.style.display = "none";
+    targetCont.style.display = "block";
+    bonusCont.style.display = "none";
+    if (targetInp) {
+      targetInp.max = "1";
+      targetInp.value = "1";
+    }
+    return;
+  }
+
+  if (targetInp) {
+    targetInp.max = "5000";
+    if (Number(targetInp.value) <= 1) targetInp.value = "5000";
+  }
 
   if (ruleType === "threshold_to_max") {
     minCont.style.display = "block";
@@ -1485,8 +1559,11 @@ async function loadActiveAdjustments(weekId) {
         const mNum = getMapNum(ch) || "?";
         const subNum = getSubSeedNum(ch);
         const hasMulti = currentAdjChallenges.filter((x) => getMapNum(x) === mNum).length > 1;
+        const isCountry = getGameType(ch) === "country_count";
         let ruleDesc = "";
-        if (adj.rule_type === "threshold_to_max") {
+        if (isCountry && adj.rule_type === "void_round") {
+          ruleDesc = `ให้ทุกคนทายถูก <strong style="color: #16a34a;">✅ 1</strong> (Void Round)`;
+        } else if (adj.rule_type === "threshold_to_max") {
           ruleDesc = `คะแนน &ge; <strong>${adj.min_score.toLocaleString()}</strong> &rarr; ปรับเป็น <strong style="color: #16a34a;">${adj.target_score.toLocaleString()}</strong>`;
         } else if (adj.rule_type === "void_round") {
           ruleDesc = `ให้ทุกคนเต็ม <strong style="color: #16a34a;">${adj.target_score.toLocaleString()}</strong> (Void Round)`;
@@ -1519,10 +1596,20 @@ if (createAdjustmentForm) {
     if (!adminDb) return;
 
     const challenge_id = Number(document.getElementById("adjMapSelect").value);
+    const ch = currentAdjChallenges.find((c) => c.id === challenge_id);
+    const isCountry = getGameType(ch) === "country_count";
     const round_number = Number(document.getElementById("adjRoundSelect").value);
     const rule_type = document.getElementById("adjRuleType").value;
+
+    if (isCountry && rule_type !== "void_round") {
+      alert("⚠️ แมพโหมด Country Count รองรับเฉพาะกฎ 'Void Round' (ให้ทุกคนทายถูก ✅ 1 ในรอบนั้น)");
+      return;
+    }
+
     const min_score = Number(document.getElementById("adjMinScore").value) || 4990;
-    const target_score = Number(document.getElementById("adjTargetScore").value) || 5000;
+    const target_score = isCountry
+      ? 1
+      : Number(document.getElementById("adjTargetScore").value) || 5000;
     const bonus_points = Number(document.getElementById("adjBonusPoints").value) || 0;
     const note = document.getElementById("adjNote").value.trim();
 
@@ -1560,15 +1647,22 @@ if (createAdjustmentForm) {
         let changed = false;
         let newRoundScore = s[rKey];
 
-        if (rule_type === "threshold_to_max" && s[rKey] >= min_score) {
-          newRoundScore = target_score;
-          changed = true;
-        } else if (rule_type === "void_round") {
-          newRoundScore = target_score || 5000;
-          changed = true;
-        } else if (rule_type === "bonus_points" && bonus_points > 0) {
-          newRoundScore = Math.min(5000, s[rKey] + bonus_points);
-          changed = true;
+        if (isCountry) {
+          if (rule_type === "void_round" && s[rKey] !== 1) {
+            newRoundScore = 1;
+            changed = true;
+          }
+        } else {
+          if (rule_type === "threshold_to_max" && s[rKey] >= min_score) {
+            newRoundScore = target_score;
+            changed = true;
+          } else if (rule_type === "void_round") {
+            newRoundScore = target_score || 5000;
+            changed = true;
+          } else if (rule_type === "bonus_points" && bonus_points > 0) {
+            newRoundScore = Math.min(5000, s[rKey] + bonus_points);
+            changed = true;
+          }
         }
 
         if (changed) {
@@ -2118,8 +2212,9 @@ function formatPlayedTime(dateStr) {
 window.openMapInspectorModal = async function (weekId, weekTitle) {
   if (!adminDb) return;
   inspWeekId = weekId;
+  const resolvedTitle = weekTitle || weeksById.get(weekId)?.title || `Week ${weekId}`;
   const modal = document.getElementById("mapInspectorModal");
-  document.getElementById("inspectorModalSubtitle").textContent = `สัปดาห์: ${weekTitle || `Week ${weekId}`}`;
+  document.getElementById("inspectorModalSubtitle").textContent = `สัปดาห์: ${resolvedTitle}`;
   document.getElementById("inspectorTableBody").innerHTML = `<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">กำลังโหลดและคำนวณคะแนนของสัปดาห์นี้...</td></tr>`;
 
   modal.classList.add("open");

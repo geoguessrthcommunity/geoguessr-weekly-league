@@ -11,6 +11,8 @@ let currentCalculatedData = null;
 let seasonStandingsCache = null;
 
 let currentMainView = "leaderboard"; // "leaderboard" | "raw"
+let activeBottomTab = "week"; // "week" | "rules" | "season"
+let selectWeekRequestSeq = 0;
 let selectedRawSeed = 1; // Map number 1 to 7
 let selectedRawSubSeed = 0; // 0 = Map Overview (multi-seed), 1..N = specific seed
 let selectedRawSubView = "map"; // "map" | "round"
@@ -131,6 +133,35 @@ function getRankClass(rank) {
   return "";
 }
 
+function filterVisibleWeeks(weeks) {
+  const now = new Date();
+  return (weeks || []).filter((w) => {
+    if (w.is_frozen) return true; // Past competition is always visible
+    if (w.is_active) {
+      if (w.start_date && new Date(w.start_date) > now) {
+        return false; // Scheduled for future, not started yet
+      }
+      return true; // Ongoing active competition
+    }
+    // สัปดาห์ที่ตั้ง start_date ไว้และถึงเวลาเริ่มแล้ว (เปิดแข่งต่อเนื่องทันที)
+    if (!w.is_active && !w.is_frozen && w.start_date && new Date(w.start_date) <= now) {
+      return true;
+    }
+    return false; // Draft / upcoming week
+  });
+}
+
+function pickDefaultWeek(visibleWeeks) {
+  const now = new Date();
+  return (
+    visibleWeeks.find(
+      (w) =>
+        (w.is_active && (!w.start_date || new Date(w.start_date) <= now)) ||
+        (!w.is_frozen && w.start_date && new Date(w.start_date) <= now)
+    ) || visibleWeeks[0]
+  );
+}
+
 /**
  * 1. Initialize and fetch all weeks
  */
@@ -158,21 +189,7 @@ async function init() {
 
     // Filter to show ONLY Active (Present) and Frozen (Past) weeks to players
     // Hide Draft / Scheduled future weeks from viewers completely
-    const now = new Date();
-    const visibleWeeks = weeks.filter((w) => {
-      if (w.is_frozen) return true; // Past competition is always visible
-      if (w.is_active) {
-        if (w.start_date && new Date(w.start_date) > now) {
-          return false; // Scheduled for future, not started yet
-        }
-        return true; // Ongoing active competition
-      }
-      // สัปดาห์ที่ตั้ง start_date ไว้และถึงเวลาเริ่มแล้ว (เปิดแข่งต่อเนื่องทันที)
-      if (!w.is_active && !w.is_frozen && w.start_date && new Date(w.start_date) <= now) {
-        return true;
-      }
-      return false; // Draft / upcoming week
-    });
+    const visibleWeeks = filterVisibleWeeks(weeks);
 
     if (visibleWeeks.length === 0) {
       scoresTableBody.innerHTML = `
@@ -200,12 +217,7 @@ async function init() {
     allWeeks = visibleWeeks;
     renderBottomTabs();
 
-    const defaultWeek =
-      allWeeks.find(
-        (w) =>
-          (w.is_active && (!w.start_date || new Date(w.start_date) <= now)) ||
-          (!w.is_frozen && w.start_date && new Date(w.start_date) <= now)
-      ) || allWeeks[0];
+    const defaultWeek = pickDefaultWeek(allWeeks);
     await selectWeek(defaultWeek.id);
 
     // Setup Supabase Realtime Listener (debounced)
@@ -230,7 +242,7 @@ function renderBottomTabs() {
   const tabsHtml = allWeeks
     .map(
       (w) => `
-      <div id="tab-week-${w.id}" class="excel-tab ${currentWeek?.id === w.id ? "active" : ""}" onclick="selectWeek(${w.id})">
+      <div id="tab-week-${w.id}" class="excel-tab ${activeBottomTab === "week" && currentWeek?.id === w.id ? "active" : ""}" onclick="selectWeek(${w.id})">
         ${w.is_frozen ? "❄️" : "🟢"} ${escapeHtml(w.title)}
       </div>
     `
@@ -239,6 +251,9 @@ function renderBottomTabs() {
 
   const rulesTab = document.getElementById("tabRules");
   const seasonTab = document.getElementById("tabSeason");
+  if (rulesTab) rulesTab.classList.toggle("active", activeBottomTab === "rules");
+  if (seasonTab) seasonTab.classList.toggle("active", activeBottomTab === "season");
+
   excelTabsList.innerHTML = "";
   if (rulesTab) excelTabsList.appendChild(rulesTab);
   if (seasonTab) excelTabsList.appendChild(seasonTab);
@@ -248,7 +263,12 @@ function renderBottomTabs() {
 /**
  * 3. Select and load a week
  */
-async function selectWeek(weekId) {
+async function selectWeek(weekId, options = {}) {
+  const isSameWeek = currentWeek?.id === weekId;
+  const preserveRawState = Boolean(options.preserveRawState && isSameWeek);
+  const reqSeq = ++selectWeekRequestSeq;
+  activeBottomTab = "week";
+
   document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
   const targetTab = document.getElementById(`tab-week-${weekId}`);
   if (targetTab) targetTab.classList.add("active");
@@ -258,10 +278,12 @@ async function selectWeek(weekId) {
   if (rulesView) rulesView.style.display = "none";
   if (seasonView) seasonView.style.display = "none";
 
-  scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">Loading data and calculating scores...</td></tr>`;
+  if (!preserveRawState) {
+    scoresTableBody.innerHTML = `<tr><td colspan="17" style="padding: 40px; text-align: center; color: #64748b;">Loading data and calculating scores...</td></tr>`;
+  }
 
   const { data: week } = await db.from("weeks").select("*").eq("id", weekId).single();
-  if (!week) return;
+  if (reqSeq !== selectWeekRequestSeq || !week) return;
   currentWeek = week;
 
   // Header Banner Info
@@ -289,7 +311,18 @@ async function selectWeek(weekId) {
     .eq("week_id", weekId)
     .order("seed_number", { ascending: true });
 
+  if (reqSeq !== selectWeekRequestSeq) return;
+
   currentChallenges = sortChallenges(challenges || []);
+  if (!preserveRawState) {
+    const groups = groupChallengesByMap(currentChallenges);
+    const firstGrp = groups[0];
+    selectedRawSeed = firstGrp ? firstGrp.mapNumber : 1;
+    selectedRawSubSeed = firstGrp && firstGrp.seeds.length > 1 ? 0 : 1;
+    selectedRawSubView = "map";
+    selectedRawRound = 0;
+  }
+
   renderMapCards(currentChallenges);
   renderTableHeaders(currentChallenges);
 
@@ -314,6 +347,8 @@ async function selectWeek(weekId) {
       .order("id", { ascending: true })
   );
 
+  if (reqSeq !== selectWeekRequestSeq) return;
+
   if (
     scErr &&
     (scErr.message?.includes("played_at") ||
@@ -327,6 +362,7 @@ async function selectWeek(weekId) {
         .in("challenge_id", challengeIds)
         .order("id", { ascending: true })
     );
+    if (reqSeq !== selectWeekRequestSeq) return;
     scores = fb.data;
   }
 
@@ -366,6 +402,8 @@ window.switchMainView = function (viewName) {
  * 5. Switch to Rules View or Season Standings View
  */
 window.switchTab = function (tabName) {
+  selectWeekRequestSeq++;
+  activeBottomTab = tabName;
   document.querySelectorAll(".excel-tab").forEach((t) => t.classList.remove("active"));
 
   if (tabName === "rules") {
@@ -1749,10 +1787,30 @@ function handleRealtimeUpdate() {
     if (isRealtimeRefreshing) return;
     try {
       isRealtimeRefreshing = true;
-      console.log("🔄 Realtime update triggered - refreshing active week data");
-      if (currentWeek) {
-        await selectWeek(currentWeek.id);
+      console.log("🔄 Realtime update triggered - refreshing active data");
+
+      const { data: weeks, error } = await db
+        .from("weeks")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (!error && Array.isArray(weeks)) {
+        allWeeks = filterVisibleWeeks(weeks);
+        renderBottomTabs();
       }
+
+      if (activeBottomTab === "week") {
+        const targetId =
+          currentWeek && allWeeks.some((w) => w.id === currentWeek.id)
+            ? currentWeek.id
+            : pickDefaultWeek(allWeeks)?.id;
+        if (targetId) {
+          await selectWeek(targetId, { preserveRawState: true });
+        }
+      } else if (activeBottomTab === "season") {
+        await loadAndRenderSeasonStandings();
+      }
+      // หากกำลังอ่านหน้า Rules อยู่ ไม่ต้องดีดกลับไปหน้า Leaderboard
     } finally {
       isRealtimeRefreshing = false;
     }
