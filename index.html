@@ -439,7 +439,7 @@
             </p>
             <ul style="margin: 6px 0 12px 24px; line-height: 1.75; font-size: 0.92rem;">
               <li>ระบบจะคำนวณคะแนนของ <strong>แต่ละ Seed แยกกัน</strong> ตามกติกาของ Map นั้น</li>
-              <li>จากนั้นนำคะแนนทุก Seed ของ Map นั้นมารวมกัน แล้ว <strong>หารด้วยจำนวน Seed ทั้งหมดของ Map นั้น</strong> (เช่น 2 Seeds หาร 2, 5 Seeds หาร 5 ปัดทศนิยม 1 ตำแหน่ง) เพื่อไม่ให้คะแนนรวมสัปดาห์เฟ้อเกิน Map อื่น</li>
+              <li>จากนั้นนำคะแนนรวมทุก Seed (ก่อนปัดเศษ) ของ Map นั้นมาบวกกัน แล้ว <strong>หารด้วยจำนวน Seed ทั้งหมดของ Map นั้น</strong> (เช่น 2 Seeds หาร 2, 5 Seeds หาร 5) แล้วค่อย <strong>ปัดเศษเป็นจำนวนเต็มในขั้นตอนสุดท้าย</strong> เพื่อไม่ให้คะแนนรวมสัปดาห์เฟ้อเกิน Map อื่น</li>
               <li><em>หมายเหตุ:</em> หากผู้เล่นเล่นไม่ครบทุก Seed ใน Map นั้น Seed ที่ไม่ได้เล่นจะถูกนับเป็น <strong>0 แต้ม</strong> เมื่อนำไปหารเฉลี่ย</li>
             </ul>
 
@@ -812,7 +812,7 @@
             </p>
             <ul style="margin: 6px 0 12px 24px; line-height: 1.75; font-size: 0.92rem;">
               <li>Each seed is scored <strong>independently</strong> using that map's scoring rules.</li>
-              <li>Your points across all seeds in that map are summed and <strong>divided by the total number of seeds</strong> in that map (e.g., divided by 2 for 2 seeds, or divided by 5 for 5 seeds, rounded to 1 decimal place) so the map weight stays balanced.</li>
+              <li>Your unrounded points across all seeds in that map are summed and <strong>divided by the total number of seeds</strong> in that map (e.g., divided by 2 for 2 seeds, or divided by 5 for 5 seeds), then <strong>rounded to the nearest whole integer at the end</strong> so the map weight stays balanced.</li>
               <li><em>Note:</em> Any unplayed seed within a multi-seed map counts as <strong>0 points</strong> when averaged.</li>
             </ul>
 

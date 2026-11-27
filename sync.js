@@ -460,17 +460,17 @@ async function sendWeekFreezeSummary(week, challenges) {
           if (!mapAgg.has(p.userId)) {
             mapAgg.set(p.userId, { username: p.username, sumPts: 0 });
           }
-          mapAgg.get(p.userId).sumPts += p.ptsMap;
+          mapAgg.get(p.userId).sumPts += p.ptsRounds;
         }
       }
 
       for (const [uid, agg] of mapAgg) {
-        const ptsMap = seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10;
+        const ptsMap = Math.round(agg.sumPts / seedCount);
         if (!playerTotals.has(uid)) {
           playerTotals.set(uid, { username: agg.username, grandTotal: 0, mapsPlayed: 0 });
         }
         const pt = playerTotals.get(uid);
-        pt.grandTotal = Math.round((pt.grandTotal + ptsMap) * 10) / 10;
+        pt.grandTotal = Math.round(pt.grandTotal + ptsMap);
         pt.mapsPlayed += 1;
       }
     }

@@ -846,7 +846,7 @@ function computeWeekStandings(challenges, scores) {
           });
         }
         const agg = aggMap.get(uId);
-        agg.sumPts += res.ptsMap;
+        agg.sumPts += res.ptsRounds;
         agg.sumRaw += res.raw[5];
         agg.seedsPlayed += 1;
         agg.seedResults[ch.id] = res;
@@ -855,7 +855,7 @@ function computeWeekStandings(challenges, scores) {
 
     const aggList = Array.from(aggMap.values()).map((agg) => ({
       ...agg,
-      ptsMap: seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10,
+      ptsMap: Math.round(agg.sumPts / seedCount),
     }));
 
     aggList.sort((a, b) => b.ptsMap - a.ptsMap || b.sumRaw - a.sumRaw);
@@ -889,7 +889,7 @@ function computeWeekStandings(challenges, scores) {
       }
     });
 
-    grandTotal = Math.round(grandTotal * 10) / 10;
+    grandTotal = Math.round(grandTotal);
 
     leaderboard.push({
       userId: uId,
@@ -954,7 +954,7 @@ function calculateAndRenderScores(scores, challenges) {
           const mapRankClass = `col-rank ${getRankClass(mData.rank)}`.trim();
           const partialSeedTitle =
             mData.seedCount > 1
-              ? `Played ${mData.seedsPlayed}/${mData.seedCount} seeds (Avg = ${mData.sumPts}/${mData.seedCount})`
+              ? `Played ${mData.seedsPlayed}/${mData.seedCount} seeds (Avg = ${formatPts(mData.sumPts)}/${mData.seedCount} → ${mData.ptsMap})`
               : "";
           const partialTag =
             mData.seedCount > 1 && mData.seedsPlayed < mData.seedCount
@@ -1050,7 +1050,7 @@ function renderRawScoresView() {
     }
 
     if (rawCalcFootnote) {
-      rawCalcFootnote.textContent = `* แมพนี้มีทั้งหมด ${activeGroup.seeds.length} Seeds — คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed) ÷ ${activeGroup.seeds.length}`;
+      rawCalcFootnote.textContent = `* แมพนี้มีทั้งหมด ${activeGroup.seeds.length} Seeds — คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed ก่อนปัดเศษ) ÷ ${activeGroup.seeds.length} แล้วปัดเป็นจำนวนเต็มในขั้นตอนสุดท้าย`;
     }
 
     const groupResultMap = mapResults.get(activeGroup.mapNumber);
@@ -1094,7 +1094,7 @@ function renderRawScoresView() {
               const rawTxt = isCountry ? `${sd.raw[5]}/5 🌍` : formatNum(sd.raw[5]);
               return `
                 <td class="raw-cell">
-                  <div class="raw-score-val">${formatPts(sd.ptsMap)} pts</div>
+                  <div class="raw-score-val">${formatPts(sd.ptsRounds)} pts</div>
                   <div class="raw-pts-badge">${rawTxt}</div>
                 </td>
               `;
@@ -1229,7 +1229,7 @@ function renderRawScoresView() {
               <td style="text-align: center; padding: 6px 4px;">${formatPlayedTime(p.playedAt)}</td>
               ${roundCells}
               ${totalCell}
-              <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatPts(p.ptsMap)}</td>
+              <td class="col-total" style="font-size: 1rem; color: #00247d;">${formatPts(activeGroup.seeds.length > 1 ? p.ptsRounds : p.ptsMap)}</td>
             </tr>
           `;
         })
@@ -1674,10 +1674,12 @@ window.openPlayerProfile = async function (userId) {
 
         const wkStandings = seasonStandingsCache?.weeklyStandingsMap?.get(ch.week_id);
         const seedRes = wkStandings?.seedResultsMap?.get(ch.id)?.get(userId);
+        const mapGroupRes = wkStandings?.mapResults?.get(getMapNum(ch))?.get(userId);
 
         let rankCls = "";
         if (seedRes) {
-          ptsMapDisplay = formatPts(seedRes.ptsMap);
+          const isMultiSeed = (mapGroupRes?.seedCount || 1) > 1;
+          ptsMapDisplay = formatPts(isMultiSeed ? seedRes.ptsRounds : seedRes.ptsMap);
           rankMapDisplay = formatRankDisplay(seedRes.rank, seedRes.totalPlayers);
           rankCls = getRankClass(seedRes.rank);
         }

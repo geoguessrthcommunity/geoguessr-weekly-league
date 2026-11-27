@@ -2351,14 +2351,14 @@ function computeInspectorCalculations() {
         }
         const agg = playerAgg.get(p.playerId);
         agg.seedData[ch.id] = p;
-        agg.sumPts += p.ptsMap;
+        agg.sumPts += p.ptsRounds;
         agg.sumRaw += p.raw[5];
       });
     });
 
     const leaderboard = Array.from(playerAgg.values()).map((agg) => ({
       ...agg,
-      ptsMap: seedCount === 1 ? agg.sumPts : Math.round((agg.sumPts / seedCount) * 10) / 10,
+      ptsMap: Math.round(agg.sumPts / seedCount),
     }));
 
     leaderboard.sort((a, b) => b.ptsMap - a.ptsMap || b.sumRaw - a.sumRaw);
@@ -2470,7 +2470,7 @@ function renderMapInspector() {
     btnRound.style.color = "#334155";
     roundPillsContainer.style.display = "none";
     if (footerNote) {
-      footerNote.textContent = `* คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed) ÷ ${activeGroup.seeds.length} (หากไม่เล่น Seed ไหนจะได้ 0 ใน Seed นั้น)`;
+      footerNote.textContent = `* คะแนนประจำ Map คำนวณจาก (ผลรวมคะแนนทุก Seed ก่อนปัดเศษ) ÷ ${activeGroup.seeds.length} แล้วปัดเป็นจำนวนเต็มในขั้นตอนสุดท้าย (หากไม่เล่น Seed ไหนจะได้ 0 ใน Seed นั้น)`;
     }
 
     const seedHeaders = activeGroup.seeds
@@ -2501,9 +2501,10 @@ function renderMapInspector() {
               return `<td style="text-align: center; color: #cbd5e1;">-</td>`;
             }
             const rawTxt = isCountry ? `${sd.raw[5]}/5 🌍` : sd.raw[5].toLocaleString();
+            const seedPtsDisp = Math.round(sd.ptsRounds * 10) / 10;
             return `
               <td style="text-align: center; padding: 6px 4px;">
-                <div style="font-weight: 700; color: #00247d;">${sd.ptsMap} pts</div>
+                <div style="font-weight: 700; color: #00247d;">${seedPtsDisp} pts</div>
                 <div style="font-size: 0.72rem; color: #64748b;">(${rawTxt})</div>
               </td>
             `;
@@ -2595,7 +2596,7 @@ function renderMapInspector() {
               <div style="font-size: 0.73rem; color: #1e3a8a; font-weight: 700;">+${p.points[5]} pts</div>
             </td>
             <td style="text-align: center; font-size: 1.05rem; font-weight: 800; color: #00247d; background: #f8fafc;">
-              ${p.ptsMap}
+              ${activeGroup.seeds.length > 1 ? Math.round(p.ptsRounds * 10) / 10 : p.ptsMap}
             </td>
           </tr>
         `;
